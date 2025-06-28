@@ -24,4 +24,5 @@ executable Main
       AllowAmbiguousTypes
   build-depends:
       base
+    , vector
   default-language: GHC2021

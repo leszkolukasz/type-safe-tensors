@@ -5,6 +5,7 @@ module Tensor
     Shape,
     Compatible,
     fromList,
+    index,
     tensorAdd,
     tensorSub,
     tensorMul,
@@ -17,7 +18,10 @@ module Tensor
 where
 
 import Data.Kind (Type)
+import Data.Vector (Vector, (!), (//))
+import Data.Vector qualified as V
 import GHC.TypeLits (Nat, Symbol)
+import Debug.Trace (trace)
 
 type Any = "Any"
 
@@ -25,13 +29,13 @@ type Shape = [Symbol]
 
 type Tensor :: Shape -> Type -> Type
 data Tensor s a where
-  Tensor :: {shape :: [Int], stride :: [Int], array :: [a]} -> Tensor s a
+  Tensor :: {shape :: [Int], array :: Vector a} -> Tensor s a
   deriving (Show)
 
 type DoubleTensor s = Tensor s Double
 
 instance Functor (Tensor s) where
-  fmap f (Tensor {shape = s, stride = sd, array = a}) = Tensor {shape = s, stride = sd, array = map f a}
+  fmap f (Tensor {shape = s, array = a}) = Tensor {shape = s, array = fmap f a}
 
 type family Compatible (s1 :: Shape) (s2 :: Shape) :: Bool where
   Compatible '[] '[] = 'True
@@ -47,42 +51,87 @@ fromList shape array
   | length array /= expectedShape =
       error ("Array cannot be reshaped: array length = " ++ show (length array) ++ ", expected length = " ++ show expectedShape)
   | otherwise =
-      Tensor {shape = shape, stride = strideFromShape shape, array = array}
+      Tensor {shape = shape, array = V.fromList array}
   where
     expectedShape = product shape
-    strideFromShape [x] = [1]
-    strideFromShape (x:xs) = product xs : map strideFromShape xs
 
-broadcastShape :: [Int] -> [Int] -> Maybe [Int]
-broadcastShape [] [] = Just []
-broadcastShape [] ys = Nothing
-broadcastShape xs [] = Nothing
-broadcastShape (x:xs) (y:ys)
-  | x == y = (x :) <$> broadcastShape xs ys
-  | x == 1 = (y :) <$> broadcastShape xs ys
-  | y == 1 = (x :) <$> broadcastShape xs ys
+indexFromStride :: Vector a -> [Int] -> [Int] -> a
+indexFromStride arr strides indices =
+  let pos = sum $ zipWith (*) indices strides
+   in arr ! pos
+
+stridesFromShape :: [Int] -> [Int]
+stridesFromShape [a] = [1]
+stridesFromShape (x : xs) = product xs : stridesFromShape xs
+
+stridesForBroadcast :: [Int] -> [Int] -> [Int]
+stridesForBroadcast oldShape broadcastShape =
+  let oldStrides = stridesFromShape oldShape
+      newStrides = stridesFromShape broadcastShape
+   in zipWith (\sd sh -> if fst sh == 1 && snd sh /= 1 then 0 else sd) oldStrides (zip oldShape broadcastShape)
+
+indicesToPos :: [Int] -> [Int] -> Int
+indicesToPos strides indices =
+  sum $ zipWith (*) indices strides
+
+posToIndices :: [Int] -> Int -> [Int]
+posToIndices strides pos = go strides pos []
+  where
+    go [] _ acc = reverse acc
+    go (s : ss) p acc =
+      let (q, r) = p `divMod` s
+       in go ss r (q : acc)
+
+index :: Tensor s a -> [Int] -> a
+index (Tensor {shape = s, array = a}) indices =
+  indexFromStride a strides indices
+  where
+    strides = stridesFromShape s
+
+set :: Tensor s a -> [Int] -> a -> Tensor s a
+set (Tensor {shape = s, array = a}) indices value =
+  let pos = indicesToPos (stridesFromShape s) indices
+      newArray = a // [(pos, value)]
+   in Tensor {shape = s, array = newArray}
+
+broadcastArray :: Vector a -> [Int] -> [Int] -> Vector a
+broadcastArray arr oldShape newShape
+  | oldShape == newShape = arr
+  | otherwise =
+      let broadcastStrides = stridesForBroadcast oldShape newShape
+          totalElements = product newShape
+          newArray = V.generate totalElements $ \i ->
+            let indices = posToIndices (stridesFromShape newShape) i in
+               indexFromStride arr broadcastStrides indices
+       in newArray
+
+-- Finds common shape for broadcasting of both arrays
+broadcastShapes :: [Int] -> [Int] -> Maybe [Int]
+broadcastShapes [] [] = Just []
+broadcastShapes [] ys = Nothing
+broadcastShapes xs [] = Nothing
+broadcastShapes (x : xs) (y : ys)
+  | x == y = (x :) <$> broadcastShapes xs ys
+  | x == 1 = (y :) <$> broadcastShapes xs ys
+  | y == 1 = (x :) <$> broadcastShapes xs ys
   | otherwise = Nothing
 
-broadcastTensorTo :: Tensor s1 a -> Tensor s2 a -> Maybe (Tensor s3 a)
-broadcastTensorTo from@(Tensor {shape = s1, array = a1}) to@(Tensor {shape = s2}) =
-  case broadcastShape s1 s2 of
-    Nothing -> Nothing
-    Just s3 -> Just $ Tensor {shape = s3, stride = strideFromShape s1 s3, array = a1}
-  where
-    strideFromShape [] [] = []
-    strideFromShape [] _ = error "Cannot broadcast empty shape to non-empty shape"
-    strideFromShape _ [] = error "Cannot broadcast non-empty shape to empty shape"
-    strideFromShape @old(x:xs) @new(y:ys)
-      | x == 1 && y /= 1 = 0 : strideFromShape xs ys
-      | otherwise = x : strideFromShape xs ys
-    
-
+broadcastTensorTo :: Tensor s1 a -> [Int] -> Tensor s1 a
+broadcastTensorTo (Tensor {shape = s1, array = a1}) shape =
+  case broadcastShapes s1 shape of
+    Nothing -> error ("Cannot broadcast shape: " ++ show s1 ++ " to " ++ show shape)
+    Just s2
+      | shape == s2 -> Tensor {shape = shape, array = broadcastArray a1 s1 shape}
+      | otherwise -> error ("Given shape: " ++ show shape ++ " has unit dimensions that would need to be broadcasted to input tensor shape")
 
 sameShapeOp :: (Compatible s1 s2 ~ 'True) => (a -> a -> a) -> Tensor s1 a -> Tensor s2 a -> Tensor s1 a
 sameShapeOp op (Tensor {shape = s1, array = a1}) (Tensor {shape = s2, array = a2}) =
-  case broadcastShape s1 s2 of
+  case broadcastShapes s1 s2 of
     Nothing -> error ("Cannot broadcast shapes: " ++ show s1 ++ " and " ++ show s2)
-    Just s3 -> Tensor {shape = s1, array = zipWith op a1 a2}
+    Just bcShape ->
+      let a1' = broadcastArray a1 s1 bcShape
+          a2' = broadcastArray a2 s2 bcShape
+       in Tensor {shape = bcShape, array = V.zipWith op a1' a2'}
 
 tensorAdd :: (Compatible s1 s2 ~ 'True, Num a) => Tensor s1 a -> Tensor s2 a -> Tensor s1 a
 tensorAdd = sameShapeOp (+)
@@ -97,8 +146,11 @@ tensorDiv :: (Compatible s1 s2 ~ 'True, Fractional a) => Tensor s1 a -> Tensor s
 tensorDiv = sameShapeOp (/)
 
 infixl 6 +.
+
 infixl 6 -.
+
 infixl 7 *.
+
 infixl 7 /.
 
 (+.) :: (Compatible s1 s2 ~ 'True, Num a) => Tensor s1 a -> Tensor s2 a -> Tensor s1 a

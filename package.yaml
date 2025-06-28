@@ -14,7 +14,7 @@ executables:
       - AllowAmbiguousTypes
     dependencies:
       - base
-      # - tensor
+      - vector
     
 
 # ghc-options:
