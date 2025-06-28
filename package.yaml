@@ -12,6 +12,7 @@ executables:
       - DataKinds
       - GADTs
       - AllowAmbiguousTypes
+      - UndecidableInstances
     dependencies:
       - base
       - vector

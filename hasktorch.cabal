@@ -13,6 +13,9 @@ executable Main
   other-modules:
       Playground
       Tensor
+      Tensor.Internal
+      Tensor.Op
+      Tensor.Types
       Utils
       Paths_hasktorch
   hs-source-dirs:
@@ -22,6 +25,7 @@ executable Main
       DataKinds
       GADTs
       AllowAmbiguousTypes
+      UndecidableInstances
   build-depends:
       base
     , vector

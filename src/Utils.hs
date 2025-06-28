@@ -1,6 +1,5 @@
 module Utils (
     ShowBoolKind (..),
-    showBool,
 ) where
     class ShowBoolKind (b :: Bool) where
         showBool :: String
