@@ -56,7 +56,28 @@ matmul ::
   Tensor s1 a ->
   Tensor s2 a ->
   Tensor (Concat (DropLastN s1 2) [n1, m2]) a
-matmul t1 t2 = undefined
+matmul (Tensor {shape = s1, array = a1}) (Tensor {shape = s2, array = a2}) =
+  let prefix1 = take (length s1 - 2) s1
+      prefix2 = take (length s2 - 2) s2
+   in if prefix1 /= prefix2
+        then error ("Broadcasting is not supported in matmul: " ++ show prefix1 ++ " vs " ++ show prefix2)
+        else
+          let n1 = last (init s1) -- SndToLast s1
+              m2 = last s2 -- Last s2
+              newShape = prefix1 ++ [n1, m2]
+              totalElements = product newShape
+              newArray =
+                V.generate totalElements $
+                  \i ->
+                    let indices = posToIndices (stridesFromShape newShape) i
+                        rowIdx = indices !! (length indices - 2) -- second to last index
+                        colIdx = last indices -- last index
+                        rowStart = rowIdx * (last s1) -- SndToLast s1
+                        colStart = colIdx * (last s2) -- Last s2
+                        sumProduct =
+                          sum $ V.zipWith (*) (V.slice rowStart (last s1) a1) (V.slice colStart (last s2) a2)
+                     in sumProduct
+           in Tensor {shape = newShape, array = newArray}
 
 infixl 6 +.
 
@@ -96,18 +117,20 @@ infixl 7 @.
   Tensor (Concat (DropLastN s1 2) [n1, m2]) a
 (@.) = matmul
 
-indexUnsafe :: Tensor s a -> [Int] -> a
-indexUnsafe (Tensor {shape = s, array = a}) indices =
-  indexFromStride a strides indices
+getUnsafe :: Tensor s a -> [Int] -> a
+getUnsafe (Tensor {shape = s, array = a}) indices =
+  let normIndices = normalizeIndices s indices
+   in indexFromStride a strides normIndices
   where
     strides = stridesFromShape s
 
-index :: forall s a n. (Length s ~ n) => Tensor s a -> LList n Int -> a
-index t l = indexUnsafe t (toList l)
+get :: forall s a n. (Length s ~ n) => Tensor s a -> LList n Int -> a
+get t l = getUnsafe t (toList l)
 
 setUnsafe :: Tensor s a -> [Int] -> a -> Tensor s a
 setUnsafe (Tensor {shape = s, array = a}) indices value =
-  let pos = indicesToPos (stridesFromShape s) indices
+  let normIndices = normalizeIndices s indices
+      pos = indicesToPos (stridesFromShape s) normIndices
       newArray = a // [(pos, value)]
    in Tensor {shape = s, array = newArray}
 
@@ -165,3 +188,9 @@ broadcastTensorTo (Tensor {shape = s1, array = a1}) (Tensor {shape = s2}) =
     Just s3
       | s2 == s3 -> Tensor {shape = s2, array = broadcastArray a1 s1 s2}
       | otherwise -> error ("Given shape: " ++ show s2 ++ " has unit dimensions that would need to be broadcasted to input tensor shape")
+
+sliceUsafe :: Tensor s a -> [Slice] -> Tensor s a
+sliceUsafe (Tensor {shape = s, array = a}) slices = undefined
+
+slice :: forall s a n. (Length s ~ n) => Tensor s a -> LList n Slice -> Tensor s a
+slice t s = sliceUsafe t (toList s)

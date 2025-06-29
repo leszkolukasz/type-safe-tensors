@@ -14,8 +14,9 @@ main = do
   putStrLn $ showBool @(Equal (Unsqueeze '["Dim1", "Dim2"] 1) ["Dim1", Any, "Dim2"])
   print $ t2 +. t4
   let n = 1
-  print $ index t1 (n :~ 1 :~ LNil)
+  print $ get t1 (n :~ 1 :~ LNil)
   let t6 = set t1 (0 :~ 1 :~ LNil) 1000.0
+  print $ t6
   --   let t7 :: DoubleTensor ["dim1", "dim3"] = t2 @. t5
   -- let t7 = t2 @. t5
   -- print (t7 +. t7)

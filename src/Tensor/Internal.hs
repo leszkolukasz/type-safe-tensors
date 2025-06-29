@@ -13,6 +13,13 @@ toInt :: Fin n -> Int
 toInt FinZ = 0
 toInt (FinS n) = 1 + toInt n
 
+normalizeIndices :: [Int] -> [Int] -> [Int]
+normalizeIndices shape indices =
+  let normalized = zipWith (\s i -> if i < 0 then s + i else i) shape indices
+   in if any (< 0) normalized || or (zipWith (<=) shape normalized)
+        then error "Indices out of bounds"
+        else normalized
+
 indexFromStride :: Vector a -> [Int] -> [Int] -> a
 indexFromStride arr strides indices =
   let pos = sum $ zipWith (*) indices strides

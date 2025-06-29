@@ -107,5 +107,10 @@ data Fin n where
   FinZ :: Fin (n + 1)
   FinS :: Fin n -> Fin (n + 1)
 
+data Slice
+  = Range Int Int
+  | Single Int
+  | All
+
 test :: Fin 3
 test = (FinS (FinS (FinZ)))
