@@ -1,9 +1,13 @@
 module Tensor.Op where
 
+import Data.Proxy (Proxy (..))
 import Data.Vector (Vector, (!), (//))
 import Data.Vector qualified as V
+import GHC.TypeLits (KnownNat, Nat, natVal, type (+), type (-), type (<=))
 import Tensor.Internal
 import Tensor.Types
+
+-- TODO: do constructors like fromNested2, fromNested3 for inputs of type [[a]], [[[a]]] etc.
 
 fromList :: [Int] -> [a] -> Tensor s a
 fromList shape array
@@ -16,7 +20,7 @@ fromList shape array
   where
     expectedShape = product shape
 
-sameShapeOp :: (Compatible s1 s2 ~ 'True) => (a -> a -> a) -> Tensor s1 a -> Tensor s2 a -> Tensor s1 a
+sameShapeOp :: (Compatible s1 s2 ~ 'True) => (a -> a -> a) -> Tensor s1 a -> Tensor s2 a -> Tensor (Union s1 s2) a
 sameShapeOp op (Tensor {shape = s1, array = a1}) (Tensor {shape = s2, array = a2}) =
   case broadcastShapes s1 s2 of
     Nothing -> error ("Cannot broadcast shapes: " ++ show s1 ++ " and " ++ show s2)
@@ -25,17 +29,34 @@ sameShapeOp op (Tensor {shape = s1, array = a1}) (Tensor {shape = s2, array = a2
           a2' = broadcastArray a2 s2 bcShape
        in Tensor {shape = bcShape, array = V.zipWith op a1' a2'}
 
-tensorAdd :: (Compatible s1 s2 ~ 'True, Num a) => Tensor s1 a -> Tensor s2 a -> Tensor s1 a
+tensorAdd :: (Compatible s1 s2 ~ 'True, Num a) => Tensor s1 a -> Tensor s2 a -> Tensor (Union s1 s2) a
 tensorAdd = sameShapeOp (+)
 
-tensorSub :: (Compatible s1 s2 ~ 'True, Num a) => Tensor s1 a -> Tensor s2 a -> Tensor s1 a
+tensorSub :: (Compatible s1 s2 ~ 'True, Num a) => Tensor s1 a -> Tensor s2 a -> Tensor (Union s1 s2) a
 tensorSub = sameShapeOp (-)
 
-tensorMul :: (Compatible s1 s2 ~ 'True, Num a) => Tensor s1 a -> Tensor s2 a -> Tensor s1 a
+tensorMul :: (Compatible s1 s2 ~ 'True, Num a) => Tensor s1 a -> Tensor s2 a -> Tensor (Union s1 s2) a
 tensorMul = sameShapeOp (*)
 
-tensorDiv :: (Compatible s1 s2 ~ 'True, Fractional a) => Tensor s1 a -> Tensor s2 a -> Tensor s1 a
+tensorDiv :: (Compatible s1 s2 ~ 'True, Fractional a) => Tensor s1 a -> Tensor s2 a -> Tensor (Union s1 s2) a
 tensorDiv = sameShapeOp (/)
+
+-- TODO: make it broadcastable
+matmul ::
+  forall s1 s2 l n1 n2 m1 m2 a.
+  ( Length s1 ~ Length s2,
+    Compatible (DropLastN s1 2) (DropLastN s2 2) ~ 'True,
+    SndToLast s1 ~ 'Just n1,
+    Last s1 ~ 'Just n2,
+    SndToLast s2 ~ 'Just m1,
+    Last s2 ~ 'Just m2,
+    n2 ~ m1,
+    Num a
+  ) =>
+  Tensor s1 a ->
+  Tensor s2 a ->
+  Tensor (Concat (DropLastN s1 2) [n1, m2]) a
+matmul t1 t2 = undefined
 
 infixl 6 +.
 
@@ -45,17 +66,35 @@ infixl 7 *.
 
 infixl 7 /.
 
-(+.) :: (Compatible s1 s2 ~ 'True, Num a) => Tensor s1 a -> Tensor s2 a -> Tensor s1 a
+infixl 7 @.
+
+(+.) :: (Compatible s1 s2 ~ 'True, Num a) => Tensor s1 a -> Tensor s2 a -> Tensor (Union s1 s2) a
 (+.) = tensorAdd
 
-(-.) :: (Compatible s1 s2 ~ 'True, Num a) => Tensor s1 a -> Tensor s2 a -> Tensor s1 a
+(-.) :: (Compatible s1 s2 ~ 'True, Num a) => Tensor s1 a -> Tensor s2 a -> Tensor (Union s1 s2) a
 (-.) = tensorSub
 
-(*.) :: (Compatible s1 s2 ~ 'True, Num a) => Tensor s1 a -> Tensor s2 a -> Tensor s1 a
+(*.) :: (Compatible s1 s2 ~ 'True, Num a) => Tensor s1 a -> Tensor s2 a -> Tensor (Union s1 s2) a
 (*.) = tensorMul
 
-(/.) :: (Compatible s1 s2 ~ 'True, Fractional a) => Tensor s1 a -> Tensor s2 a -> Tensor s1 a
+(/.) :: (Compatible s1 s2 ~ 'True, Fractional a) => Tensor s1 a -> Tensor s2 a -> Tensor (Union s1 s2) a
 (/.) = tensorDiv
+
+(@.) ::
+  forall s1 s2 l n1 n2 m1 m2 a.
+  ( Length s1 ~ Length s2,
+    Compatible (DropLastN s1 2) (DropLastN s2 2) ~ 'True,
+    SndToLast s1 ~ 'Just n1,
+    Last s1 ~ 'Just n2,
+    SndToLast s2 ~ 'Just m1,
+    Last s2 ~ 'Just m2,
+    n2 ~ m1,
+    Num a
+  ) =>
+  Tensor s1 a ->
+  Tensor s2 a ->
+  Tensor (Concat (DropLastN s1 2) [n1, m2]) a
+(@.) = matmul
 
 indexUnsafe :: Tensor s a -> [Int] -> a
 indexUnsafe (Tensor {shape = s, array = a}) indices =
@@ -75,10 +114,54 @@ setUnsafe (Tensor {shape = s, array = a}) indices value =
 set :: forall s a n. (Length s ~ n) => Tensor s a -> LList n Int -> a -> Tensor s a
 set t l value = setUnsafe t (toList l) value
 
-broadcastTensorTo :: Tensor s1 a -> [Int] -> Tensor s1 a
-broadcastTensorTo (Tensor {shape = s1, array = a1}) shape =
-  case broadcastShapes s1 shape of
-    Nothing -> error ("Cannot broadcast shape: " ++ show s1 ++ " to " ++ show shape)
-    Just s2
-      | shape == s2 -> Tensor {shape = shape, array = broadcastArray a1 s1 shape}
-      | otherwise -> error ("Given shape: " ++ show shape ++ " has unit dimensions that would need to be broadcasted to input tensor shape")
+unsqueezeUnsafe :: Tensor s a -> Int -> Tensor s' a
+unsqueezeUnsafe (Tensor {shape = s, array = a}) n =
+  if n < 0 || n > length s
+    then error ("Invalid dimension " ++ show n ++ " for shape " ++ show s)
+    else
+      let newShape = take n s ++ [1] ++ drop n s
+       in Tensor {shape = newShape, array = a}
+
+unsqueeze :: forall n s a. (n <= Length s, KnownNat n) => Tensor s a -> Tensor (Unsqueeze s n) a
+unsqueeze t = unsqueezeUnsafe t (fromIntegral (natVal (Proxy @n)))
+
+squeezeUnsafe :: Tensor s a -> Int -> Tensor s' a
+squeezeUnsafe (Tensor {shape = s, array = a}) n =
+  if s !! n /= 1
+    then error ("Cannot squeeze dimension " ++ show n ++ " of shape " ++ show s ++ " because it is not 1")
+    else
+      let newShape = take n s ++ drop (n + 1) s
+       in Tensor {shape = newShape, array = a}
+
+squeeze :: forall n s a. (n + 1 <= Length s, KnownNat n) => Tensor s a -> Tensor (DropNth s n) a
+squeeze t = squeezeUnsafe t (fromIntegral (natVal (Proxy @n)))
+
+-- Unsqueeze a tensor to the same shape length as another tensor
+unsqueezeTo ::
+  forall n s1 s2 a l1 l2.
+  ( l1 ~ Length s1,
+    l2 ~ Length s2,
+    -- KnownNat l1,
+    -- KnownNat l2,
+    l1 <= l2,
+    Compatible (DropFirstN s2 (l2 - l1)) s1 ~ 'True
+  ) =>
+  Tensor s1 a ->
+  Tensor s2 a ->
+  -- Tensor (Prepend s1 (Length s2 - Length s1) Any) a
+  Tensor s2 a
+unsqueezeTo from@(Tensor {shape = s1, array = a1}) to@(Tensor {shape = s2}) =
+  let n = length s2 - length s1
+      newShape = replicate n 1 ++ s1
+   in Tensor {shape = newShape, array = a1}
+
+test :: DoubleTensor [Any, "Dim"]
+test = unsqueeze @(0) (fromList [3] [4.0, 5.0, 6.0] :: DoubleTensor '["Dim"])
+
+broadcastTensorTo :: Tensor s1 a -> Tensor s2 a -> Tensor s2 a
+broadcastTensorTo (Tensor {shape = s1, array = a1}) (Tensor {shape = s2}) =
+  case broadcastShapes s1 s2 of
+    Nothing -> error ("Cannot broadcast shape: " ++ show s1 ++ " to " ++ show s2)
+    Just s3
+      | s2 == s3 -> Tensor {shape = s2, array = broadcastArray a1 s1 s2}
+      | otherwise -> error ("Given shape: " ++ show s2 ++ " has unit dimensions that would need to be broadcasted to input tensor shape")

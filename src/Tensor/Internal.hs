@@ -1,5 +1,6 @@
 module Tensor.Internal where
 
+import Data.List (intercalate)
 import Data.Vector (Vector, (!))
 import Data.Vector qualified as V
 import Tensor.Types
@@ -7,6 +8,10 @@ import Tensor.Types
 toList :: LList n a -> [a]
 toList LNil = []
 toList (x :~ xs) = x : toList xs
+
+toInt :: Fin n -> Int
+toInt FinZ = 0
+toInt (FinS n) = 1 + toInt n
 
 indexFromStride :: Vector a -> [Int] -> [Int] -> a
 indexFromStride arr strides indices =
@@ -56,3 +61,18 @@ broadcastShapes (x : xs) (y : ys)
   | x == 1 = (y :) <$> broadcastShapes xs ys
   | y == 1 = (x :) <$> broadcastShapes xs ys
   | otherwise = Nothing
+
+instance (Show a) => Show (Tensor s a) where
+  show (Tensor sh arr) =
+    "Tensor " ++ show sh ++ ":\n" ++ formatArray sh (V.toList arr)
+
+formatArray :: (Show a) => [Int] -> [a] -> String
+formatArray [] xs = error "Tensor has no dimensions"
+formatArray [d] xs = "[" ++ intercalate ", " (map show xs) ++ "]"
+formatArray (d : ds) xs =
+  let chunked = chunksOf (product ds) xs
+   in "[" ++ intercalate ",\n " (map (formatArray ds) chunked) ++ "]"
+
+chunksOf :: Int -> [a] -> [[a]]
+chunksOf _ [] = []
+chunksOf n xs = let (h, t) = splitAt n xs in h : chunksOf n t

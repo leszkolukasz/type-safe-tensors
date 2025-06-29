@@ -3,7 +3,7 @@ module Tensor.Types where
 import Data.Kind (Type)
 import Data.Vector (Vector)
 import Data.Vector qualified as V
-import GHC.TypeLits (Nat, Symbol, type (+))
+import GHC.TypeLits (ErrorMessage (..), Nat, Symbol, TypeError, type (+), type (-))
 
 type Any = "Any"
 
@@ -11,7 +11,6 @@ type Shape = [Symbol]
 
 data Tensor (s :: Shape) (a :: Type) where
   Tensor :: {shape :: [Int], array :: Vector a} -> Tensor s a
-  deriving (Show)
 
 type DoubleTensor s = Tensor s Double
 
@@ -26,12 +25,87 @@ type family Compatible (s1 :: Shape) (s2 :: Shape) :: Bool where
   Compatible (_ : s1) (Any : s2) = Compatible s1 s2
   Compatible _ _ = 'False
 
+type family Union (s1 :: Shape) (s2 :: Shape) :: Shape where
+  Union '[] '[] = '[]
+  Union (n : s1) (n : s2) = n : Union s1 s2
+  Union (Any : s1) (n : s2) = n : Union s1 s2
+  Union (n : s1) (Any : s2) = n : Union s1 s2
+  Union _ _ = TypeError ('Text "Cannot unionize incompatible shapes")
+
+type family Equal (s1 :: Shape) (s2 :: Shape) :: Bool where
+  Equal '[] '[] = 'True
+  Equal (n : s1) (n : s2) = Equal s1 s2
+  Equal _ _ = 'False
+
+type family FirstTuple (l :: (a, b)) :: a where
+  FirstTuple '(x, _) = x
+
+type family SecondTuple (l :: (a, b)) :: b where
+  SecondTuple '(_, y) = y
+
+type family Last (l :: [a]) :: Maybe a where
+  Last '[] = 'Nothing
+  Last '[x] = 'Just x
+  Last (_ : xs) = Last xs
+
+type family SndToLast (l :: [a]) :: Maybe a where
+  SndToLast '[] = 'Nothing
+  SndToLast '[x] = 'Nothing
+  SndToLast '[y, _] = 'Just y
+  SndToLast (_ : xs) = SndToLast xs
+
+type family Length (l :: [a]) :: Nat where
+  Length '[] = 0
+  Length (_ : xs) = 1 + Length xs
+
+type family Concat (l1 :: [a]) (l2 :: [a]) :: [a] where
+  Concat '[] l2 = l2
+  Concat (x : xs) l2 = x : Concat xs l2
+
+type family Reverse (l :: [a]) :: [a] where
+  Reverse '[] = '[]
+  Reverse (x : xs) = Concat (Reverse xs) '[x]
+
+type family DropFirstN (l :: [a]) (n :: Nat) :: [a] where
+  DropFirstN '[] _ = '[]
+  DropFirstN xs 0 = xs
+  DropFirstN (_ : xs) n = DropFirstN xs (n - 1)
+
+type family DropLastN (l :: [a]) (n :: Nat) :: [a] where
+  DropLastN '[] _ = '[]
+  DropLastN xs 0 = xs
+  DropLastN xs n = Reverse (DropFirstN (Reverse xs) n)
+
+type family TakeFirstN (l :: [a]) (n :: Nat) :: [a] where
+  TakeFirstN l n = DropLastN l (Length l - n)
+
+type family TakeLastN (l :: [a]) (n :: Nat) :: [a] where
+  TakeLastN l n = DropFirstN l (Length l - n)
+
+type family Split (l :: [a]) (n :: Nat) :: ([a], [a]) where
+  Split l n = '(TakeFirstN l n, DropFirstN l n)
+
+type family DropNth (l :: [a]) (n :: Nat) :: [a] where
+  DropNth '[] _ = '[]
+  DropNth xs 0 = xs
+  DropNth (x : xs) n = x : DropNth xs (n - 1)
+
+type family Unsqueeze (s :: Shape) (n :: Nat) :: Shape where
+  Unsqueeze s n = Concat (TakeFirstN s n) (Any : DropFirstN s n)
+
+type family Prepend (s :: Shape) (n :: Nat) (v :: Symbol) :: Shape where
+  Prepend s 0 v = s
+  Prepend l n v = v : Prepend l (n - 1) v
+
 infixr 5 :~
 
 data LList (n :: Nat) (a :: Type) where
   LNil :: LList 0 a
   (:~) :: a -> LList n a -> LList (n + 1) a
 
-type family Length (l :: [a]) :: Nat where
-  Length '[] = 0
-  Length (_ : xs) = 1 + Length xs
+data Fin n where
+  FinZ :: Fin (n + 1)
+  FinS :: Fin n -> Fin (n + 1)
+
+test :: Fin 3
+test = (FinS (FinS (FinZ)))
