@@ -1,11 +1,13 @@
-module Utils (
-    ShowBoolKind (..),
-) where
-    class ShowBoolKind (b :: Bool) where
-        showBool :: String
+module Utils where
 
-    instance ShowBoolKind 'True where
-        showBool = "True"
+(|>) :: a -> (a -> b) -> b
+x |> f = f x
 
-    instance ShowBoolKind 'False where
-        showBool = "False"
+class ShowBoolKind (b :: Bool) where
+  showBool :: String
+
+instance ShowBoolKind 'True where
+  showBool = "True"
+
+instance ShowBoolKind 'False where
+  showBool = "False"

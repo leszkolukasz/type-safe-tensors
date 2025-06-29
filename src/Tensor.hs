@@ -4,6 +4,7 @@ module Tensor
     FloatTensor,
     IntTensor,
     LList (..),
+    Slice (..),
     Compatible,
     Unsqueeze,
     Equal,
@@ -31,6 +32,9 @@ module Tensor
     unsqueezeTo,
     squeezeUnsafe,
     squeeze,
+    sliceUsafe,
+    slice,
+    broadcastTensorTo,
   )
 where
 

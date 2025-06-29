@@ -1,11 +1,13 @@
 module Tensor.Op where
 
+import Data.Maybe (fromJust, listToMaybe)
 import Data.Proxy (Proxy (..))
 import Data.Vector (Vector, (!), (//))
 import Data.Vector qualified as V
 import GHC.TypeLits (KnownNat, Nat, natVal, type (+), type (-), type (<=))
 import Tensor.Internal
 import Tensor.Types
+import Utils ((|>))
 
 -- TODO: do constructors like fromNested2, fromNested3 for inputs of type [[a]], [[[a]]] etc.
 
@@ -56,27 +58,28 @@ matmul ::
   Tensor s1 a ->
   Tensor s2 a ->
   Tensor (Concat (DropLastN s1 2) [n1, m2]) a
-matmul (Tensor {shape = s1, array = a1}) (Tensor {shape = s2, array = a2}) =
+matmul t1@(Tensor {shape = s1, array = a1}) t2@(Tensor {shape = s2, array = a2}) =
   let prefix1 = take (length s1 - 2) s1
       prefix2 = take (length s2 - 2) s2
    in if prefix1 /= prefix2
         then error ("Broadcasting is not supported in matmul: " ++ show prefix1 ++ " vs " ++ show prefix2)
         else
-          let n1 = last (init s1) -- SndToLast s1
-              m2 = last s2 -- Last s2
+          let n1 = last (init s1)
+              m2 = last s2
               newShape = prefix1 ++ [n1, m2]
               totalElements = product newShape
               newArray =
                 V.generate totalElements $
                   \i ->
                     let indices = posToIndices (stridesFromShape newShape) i
-                        rowIdx = indices !! (length indices - 2) -- second to last index
-                        colIdx = last indices -- last index
-                        rowStart = rowIdx * (last s1) -- SndToLast s1
-                        colStart = colIdx * (last s2) -- Last s2
-                        sumProduct =
-                          sum $ V.zipWith (*) (V.slice rowStart (last s1) a1) (V.slice colStart (last s2) a2)
-                     in sumProduct
+                        rowIdx = indices !! (length indices - 2)
+                        colIdx = last indices
+                        slice1 = map Single (take (length s1 - 2) indices) ++ [Single rowIdx, All]
+                        slice2 = map Single (take (length s2 - 2) indices) ++ [All, Single colIdx]
+                        row = array $ sliceUsafe t1 slice1
+                        col = array $ sliceUsafe t2 slice2
+                        dotProduct = V.sum $ V.zipWith (*) row col
+                     in dotProduct
            in Tensor {shape = newShape, array = newArray}
 
 infixl 6 +.
@@ -190,7 +193,23 @@ broadcastTensorTo (Tensor {shape = s1, array = a1}) (Tensor {shape = s2}) =
       | otherwise -> error ("Given shape: " ++ show s2 ++ " has unit dimensions that would need to be broadcasted to input tensor shape")
 
 sliceUsafe :: Tensor s a -> [Slice] -> Tensor s a
-sliceUsafe (Tensor {shape = s, array = a}) slices = undefined
+sliceUsafe (Tensor {shape = s, array = a}) slices =
+  let normSlices = normalizeSlices s slices
+      indexIntervals = zipWith toIndex s normSlices
+      newShape = map length indexIntervals
+      newStrides = stridesFromShape newShape
+      origStrides = stridesFromShape s
+      totalElements = product newShape
+      newArray =
+        V.generate totalElements $ \i ->
+          let newIndices = posToIndices newStrides i
+              oldIndices = zipWith (\idx range -> idx + (range |> listToMaybe |> fromJust)) newIndices indexIntervals
+           in indexFromStride a origStrides oldIndices
+   in Tensor {shape = newShape, array = newArray}
+  where
+    toIndex _ (Range start end) = [start .. end - 1]
+    toIndex _ (Single idx) = [idx]
+    toIndex s All = [0 .. s - 1]
 
 slice :: forall s a n. (Length s ~ n) => Tensor s a -> LList n Slice -> Tensor s a
 slice t s = sliceUsafe t (toList s)

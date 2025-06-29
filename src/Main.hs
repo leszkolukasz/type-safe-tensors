@@ -17,10 +17,13 @@ main = do
   print $ get t1 (n :~ 1 :~ LNil)
   let t6 = set t1 (0 :~ 1 :~ LNil) 1000.0
   print $ t6
-  --   let t7 :: DoubleTensor ["dim1", "dim3"] = t2 @. t5
-  -- let t7 = t2 @. t5
-  -- print (t7 +. t7)
+  let t7 = t4 @. t5
+  print t7
+  print (t7 +. t7)
   print $ squeeze @0 t3
   let t8 = fromList [3] [1000.0, 10001.0, 10002.0] :: DoubleTensor '["dim3"]
   let t9 = fromList [1, 1, 3] [1000.0, 10001.0, 10002.0] :: DoubleTensor '["dim1", "dim2", "dim3"]
   print $ t9 +. unsqueezeTo t8 t9
+  print $ squeeze @0 $ slice t1 (Single 1 :~ Range 1 2 :~ LNil)
+  let t10 = fromList [2, 2] [1.0, 0.0, 1.0, 1.0] :: DoubleTensor '["dim1", "dim1"]
+  print $ t10 @. t10

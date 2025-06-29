@@ -20,6 +20,24 @@ normalizeIndices shape indices =
         then error "Indices out of bounds"
         else normalized
 
+normalizeSlices :: [Int] -> [Slice] -> [Slice]
+normalizeSlices shape slices =
+  zipWith normalizeSlice shape slices
+  where
+    normalizeSlice :: Int -> Slice -> Slice
+    normalizeSlice _ All = All
+    normalizeSlice s (Range start end) =
+      let start' = if start < 0 then s + start else start
+          end' = if end < 0 then s + end else end
+       in if start' < 0 || end' > s || start' >= end'
+            then error "Invalid range"
+            else Range start' end'
+    normalizeSlice s (Single idx) =
+      let idx' = if idx < 0 then s + idx else idx
+       in if idx' < 0 || idx' >= s
+            then error "Index out of bounds"
+            else Single idx'
+
 indexFromStride :: Vector a -> [Int] -> [Int] -> a
 indexFromStride arr strides indices =
   let pos = sum $ zipWith (*) indices strides
