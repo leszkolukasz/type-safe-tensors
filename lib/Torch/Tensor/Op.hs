@@ -1,13 +1,13 @@
-module Tensor.Op where
+module Torch.Tensor.Op where
 
 import Data.Maybe (fromJust, listToMaybe)
 import Data.Proxy (Proxy (..))
 import Data.Vector (Vector, (!), (//))
 import Data.Vector qualified as V
 import GHC.TypeLits (KnownNat, Nat, natVal, type (+), type (-), type (<=))
-import Tensor.Internal
-import Tensor.Types
-import Utils ((|>))
+import Torch.Tensor.Internal
+import Torch.Tensor.Types
+import Torch.Utils ((|>))
 
 -- TODO: do constructors like fromNested2, fromNested3 for inputs of type [[a]], [[[a]]] etc.
 
@@ -22,50 +22,76 @@ fromList shape array
   where
     expectedShape = product shape
 
-sameShapeOp :: (Compatible s1 s2 ~ 'True) => (a -> a -> a) -> Tensor s1 a -> Tensor s2 a -> Tensor (Union s1 s2) a
-sameShapeOp op (Tensor {shape = s1, array = a1}) (Tensor {shape = s2, array = a2}) =
-  case broadcastShapes s1 s2 of
-    Nothing -> error ("Cannot broadcast shapes: " ++ show s1 ++ " and " ++ show s2)
-    Just bcShape ->
-      let a1' = broadcastArray a1 s1 bcShape
-          a2' = broadcastArray a2 s2 bcShape
-       in Tensor {shape = bcShape, array = V.zipWith op a1' a2'}
+fromNested2 :: [[a]] -> Tensor [s1, s2] a
+fromNested2 nested
+  | null nested || any null nested =
+      error "Input cannot be empty or contain empty lists"
+  | otherwise =
+      let shape = [length nested, length (head nested)]
+          array = concat nested
+       in if not (validateShape shape nested)
+            then error ("Invalid shape: " ++ show shape ++ " for input")
+            else fromList shape array
+  where
+    validateShape :: [Int] -> [[a]] -> Bool
+    validateShape s arr =
+      if any (/= s !! 1) (map length arr)
+        then error "All inner lists must have the same length"
+        else True
 
-tensorAdd :: (Compatible s1 s2 ~ 'True, Num a) => Tensor s1 a -> Tensor s2 a -> Tensor (Union s1 s2) a
+sameShapeOp :: (Broadcastable s1 s2 ~ 'True) => (a -> a -> a) -> Tensor s1 a -> Tensor s2 a -> Tensor (BroadcastUnion s1 s2) a
+sameShapeOp op (Tensor {shape = s1, array = a1}) (Tensor {shape = s2, array = a2}) =
+  let s1' = unsqueezeShapeToIfPossible s1 s2
+      s2' = unsqueezeShapeToIfPossible s2 s1
+   in case broadcastShapes s1' s2' of
+        Nothing -> error ("Cannot broadcast shapes: " ++ show s1 ++ " and " ++ show s2)
+        Just bcShape ->
+          let a1' = broadcastArray a1 s1' bcShape
+              a2' = broadcastArray a2 s2' bcShape
+           in Tensor {shape = bcShape, array = V.zipWith op a1' a2'}
+
+tensorAdd :: (Broadcastable s1 s2 ~ 'True, Num a) => Tensor s1 a -> Tensor s2 a -> Tensor (BroadcastUnion s1 s2) a
 tensorAdd = sameShapeOp (+)
 
-tensorSub :: (Compatible s1 s2 ~ 'True, Num a) => Tensor s1 a -> Tensor s2 a -> Tensor (Union s1 s2) a
+tensorSub :: (Broadcastable s1 s2 ~ 'True, Num a) => Tensor s1 a -> Tensor s2 a -> Tensor (BroadcastUnion s1 s2) a
 tensorSub = sameShapeOp (-)
 
-tensorMul :: (Compatible s1 s2 ~ 'True, Num a) => Tensor s1 a -> Tensor s2 a -> Tensor (Union s1 s2) a
+tensorMul :: (Broadcastable s1 s2 ~ 'True, Num a) => Tensor s1 a -> Tensor s2 a -> Tensor (BroadcastUnion s1 s2) a
 tensorMul = sameShapeOp (*)
 
-tensorDiv :: (Compatible s1 s2 ~ 'True, Fractional a) => Tensor s1 a -> Tensor s2 a -> Tensor (Union s1 s2) a
+tensorDiv :: (Broadcastable s1 s2 ~ 'True, Fractional a) => Tensor s1 a -> Tensor s2 a -> Tensor (BroadcastUnion s1 s2) a
 tensorDiv = sameShapeOp (/)
 
 -- TODO: make it broadcastable
 matmul ::
   forall s1 s2 l n1 n2 m1 m2 a.
-  ( Length s1 ~ Length s2,
-    Compatible (DropLastN s1 2) (DropLastN s2 2) ~ 'True,
+  ( Broadcastable (DropLastN s1 2) (DropLastN s2 2) ~ 'True,
     SndToLast s1 ~ 'Just n1,
     Last s1 ~ 'Just n2,
     SndToLast s2 ~ 'Just m1,
     Last s2 ~ 'Just m2,
-    n2 ~ m1,
+    Compatible '[n1] '[n2] ~ 'True,
     Num a
   ) =>
   Tensor s1 a ->
   Tensor s2 a ->
   Tensor (Concat (DropLastN s1 2) [n1, m2]) a
 matmul t1@(Tensor {shape = s1, array = a1}) t2@(Tensor {shape = s2, array = a2}) =
-  let prefix1 = take (length s1 - 2) s1
-      prefix2 = take (length s2 - 2) s2
-   in if prefix1 /= prefix2
-        then error ("Broadcasting is not supported in matmul: " ++ show prefix1 ++ " vs " ++ show prefix2)
-        else
-          let n1 = last (init s1)
-              m2 = last s2
+  let s1' = unsqueezeShapeToIfPossible s1 s2
+      s2' = unsqueezeShapeToIfPossible s2 s1
+      prefix1 = take (length s1 - 2) s1'
+      prefix2 = take (length s2 - 2) s2'
+   in case broadcastShapes prefix1 prefix2 of
+        Nothing -> error ("Cannot broadcast shapes: " ++ show s1 ++ " and " ++ show s2)
+        Just bcShape ->
+          let s1'' = bcShape ++ drop (length prefix1) s1'
+              s2'' = bcShape ++ drop (length prefix2) s2'
+              a1' = broadcastArray a1 s1 s1''
+              a2' = broadcastArray a2 s2 s2''
+              t1' = Tensor {shape = s1'', array = a1'}
+              t2' = Tensor {shape = s2'', array = a2'}
+              n1 = last (init s1'')
+              m2 = last s2''
               newShape = prefix1 ++ [n1, m2]
               totalElements = product newShape
               newArray =
@@ -74,10 +100,10 @@ matmul t1@(Tensor {shape = s1, array = a1}) t2@(Tensor {shape = s2, array = a2})
                     let indices = posToIndices (stridesFromShape newShape) i
                         rowIdx = indices !! (length indices - 2)
                         colIdx = last indices
-                        slice1 = map Single (take (length s1 - 2) indices) ++ [Single rowIdx, All]
-                        slice2 = map Single (take (length s2 - 2) indices) ++ [All, Single colIdx]
-                        row = array $ sliceUsafe t1 slice1
-                        col = array $ sliceUsafe t2 slice2
+                        slice1 = map Single (take (length s1'' - 2) indices) ++ [Single rowIdx, All]
+                        slice2 = map Single (take (length s2'' - 2) indices) ++ [All, Single colIdx]
+                        row = array $ sliceUsafe t1' slice1
+                        col = array $ sliceUsafe t2' slice2
                         dotProduct = V.sum $ V.zipWith (*) row col
                      in dotProduct
            in Tensor {shape = newShape, array = newArray}
@@ -92,27 +118,26 @@ infixl 7 /.
 
 infixl 7 @.
 
-(+.) :: (Compatible s1 s2 ~ 'True, Num a) => Tensor s1 a -> Tensor s2 a -> Tensor (Union s1 s2) a
+(+.) :: (Broadcastable s1 s2 ~ 'True, Num a) => Tensor s1 a -> Tensor s2 a -> Tensor (BroadcastUnion s1 s2) a
 (+.) = tensorAdd
 
-(-.) :: (Compatible s1 s2 ~ 'True, Num a) => Tensor s1 a -> Tensor s2 a -> Tensor (Union s1 s2) a
+(-.) :: (Broadcastable s1 s2 ~ 'True, Num a) => Tensor s1 a -> Tensor s2 a -> Tensor (BroadcastUnion s1 s2) a
 (-.) = tensorSub
 
-(*.) :: (Compatible s1 s2 ~ 'True, Num a) => Tensor s1 a -> Tensor s2 a -> Tensor (Union s1 s2) a
+(*.) :: (Broadcastable s1 s2 ~ 'True, Num a) => Tensor s1 a -> Tensor s2 a -> Tensor (BroadcastUnion s1 s2) a
 (*.) = tensorMul
 
-(/.) :: (Compatible s1 s2 ~ 'True, Fractional a) => Tensor s1 a -> Tensor s2 a -> Tensor (Union s1 s2) a
+(/.) :: (Broadcastable s1 s2 ~ 'True, Fractional a) => Tensor s1 a -> Tensor s2 a -> Tensor (BroadcastUnion s1 s2) a
 (/.) = tensorDiv
 
 (@.) ::
   forall s1 s2 l n1 n2 m1 m2 a.
-  ( Length s1 ~ Length s2,
-    Compatible (DropLastN s1 2) (DropLastN s2 2) ~ 'True,
+  ( Broadcastable (DropLastN s1 2) (DropLastN s2 2) ~ 'True,
     SndToLast s1 ~ 'Just n1,
     Last s1 ~ 'Just n2,
     SndToLast s2 ~ 'Just m1,
     Last s2 ~ 'Just m2,
-    n2 ~ m1,
+    Compatible '[n1] '[n2] ~ 'True,
     Num a
   ) =>
   Tensor s1 a ->

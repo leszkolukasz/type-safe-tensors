@@ -1,8 +1,11 @@
-.PHONY: all clean build
+.PHONY: all build run test
 
 build:
 	@hpack
 	@cabal build
 
 run: build
-	@cabal run Main
+	@cabal run example
+
+test: build
+	@cabal test

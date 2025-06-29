@@ -1,8 +1,8 @@
-module Module where
+module Torch.Module where
 
 import Data.Kind (Type)
 import GHC.TypeLits (Symbol)
-import Tensor.Types
+import Torch.Tensor.Types
 
 -- class Module (m: Shape -> Shape) where
 --   forward :: Tensor m inp a -> Tensor m out a

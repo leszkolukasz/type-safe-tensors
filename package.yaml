@@ -1,48 +1,34 @@
 name: hasktorch
-
 language: GHC2021
 
+default-extensions:
+  - TypeFamilies
+  - DataKinds
+  - GADTs
+  - AllowAmbiguousTypes
+  - UndecidableInstances
+
+library:
+  source-dirs: lib
+  dependencies:
+    - base
+    - vector
+
 executables:
-  Main:
+  example:
     main: Main.hs
-    source-dirs:
-      - src
-    default-extensions:
-      - TypeFamilies
-      - DataKinds
-      - GADTs
-      - AllowAmbiguousTypes
-      - UndecidableInstances
+    source-dirs: app
     dependencies:
       - base
+      - hasktorch
       - vector
-    
 
-# ghc-options:
-#   - -O2
-#   - -threaded
-#   - -rtsopts
-#   - -eventlog
-  
-# dependencies:
-#   - array
-#   - base
-#   - deepseq
-#   - parallel
-
-# executables:
-#   sudoku1:
-#     main: sudoku1.hs
-#     other-modules: Sudoku
-#   sudoku2:
-#     main: sudoku2.hs
-#     other-modules: Sudoku
-#   sudoku3b:
-#     main: sudoku3b.hs
-#     other-modules: Sudoku
-#   parfib:
-#     main: parfib.hs
-#   badfib2:
-#     main: parfib2.hs
-#   badfib:
-#     main: badfib.hs
+tests:
+  hasktorch-test:
+    main: Spec.hs
+    source-dirs: test
+    dependencies:
+      - base
+      - hasktorch
+      - hspec
+      - vector

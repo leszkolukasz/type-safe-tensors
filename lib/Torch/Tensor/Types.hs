@@ -1,4 +1,4 @@
-module Tensor.Types where
+module Torch.Tensor.Types where
 
 import Data.Kind (Type)
 import Data.Vector (Vector)
@@ -11,6 +11,7 @@ type Shape = [Symbol]
 
 data Tensor (s :: Shape) (a :: Type) where
   Tensor :: {shape :: [Int], array :: Vector a} -> Tensor s a
+  deriving (Eq)
 
 type DoubleTensor s = Tensor s Double
 
@@ -25,12 +26,35 @@ type family Compatible (s1 :: Shape) (s2 :: Shape) :: Bool where
   Compatible (_ : s1) (Any : s2) = Compatible s1 s2
   Compatible _ _ = 'False
 
+type family Broadcastable (s1 :: Shape) (s2 :: Shape) :: Bool where
+  Broadcastable l1 l2 = BroadcastableGo (Reverse l1) (Reverse l2)
+
+type family BroadcastableGo (s1 :: [Symbol]) (s2 :: [Symbol]) :: Bool where
+  BroadcastableGo '[] _ = 'True
+  BroadcastableGo _ '[] = 'True
+  BroadcastableGo (Any : s1) (_ : s2) = BroadcastableGo s1 s2
+  BroadcastableGo (_ : s1) (Any : s2) = BroadcastableGo s1 s2
+  BroadcastableGo (n : s1) (n : s2) = BroadcastableGo s1 s2
+  BroadcastableGo _ _ = 'False
+
 type family Union (s1 :: Shape) (s2 :: Shape) :: Shape where
   Union '[] '[] = '[]
   Union (n : s1) (n : s2) = n : Union s1 s2
   Union (Any : s1) (n : s2) = n : Union s1 s2
   Union (n : s1) (Any : s2) = n : Union s1 s2
   Union _ _ = TypeError ('Text "Cannot unionize incompatible shapes")
+
+type family BroadcastUnion (s1 :: Shape) (s2 :: Shape) :: Shape where
+  BroadcastUnion s1 s2 = Reverse (BroadcastUnionGo (Reverse s1) (Reverse s2))
+
+type family BroadcastUnionGo (s1 :: [Symbol]) (s2 :: [Symbol]) :: Shape where
+  BroadcastUnionGo '[] '[] = '[]
+  BroadcastUnionGo '[] (n : s2) = n : BroadcastUnionGo '[] s2
+  BroadcastUnionGo (n : s1) '[] = n : BroadcastUnionGo s1 '[]
+  BroadcastUnionGo (Any : s1) (n : s2) = n : BroadcastUnionGo s1 s2
+  BroadcastUnionGo (n : s1) (Any : s2) = n : BroadcastUnionGo s1 s2
+  BroadcastUnionGo (n : s1) (n : s2) = n : BroadcastUnionGo s1 s2
+  BroadcastUnionGo _ _ = TypeError ('Text "Cannot broadcast-unionize incompatible shapes")
 
 type family Equal (s1 :: Shape) (s2 :: Shape) :: Bool where
   Equal '[] '[] = 'True
@@ -87,7 +111,7 @@ type family Split (l :: [a]) (n :: Nat) :: ([a], [a]) where
 
 type family DropNth (l :: [a]) (n :: Nat) :: [a] where
   DropNth '[] _ = '[]
-  DropNth xs 0 = xs
+  DropNth (x : xs) 0 = xs
   DropNth (x : xs) n = x : DropNth xs (n - 1)
 
 type family Unsqueeze (s :: Shape) (n :: Nat) :: Shape where
@@ -111,6 +135,3 @@ data Slice
   = Range Int Int
   | Single Int
   | All
-
-test :: Fin 3
-test = (FinS (FinS (FinZ)))

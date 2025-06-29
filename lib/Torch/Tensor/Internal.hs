@@ -1,9 +1,9 @@
-module Tensor.Internal where
+module Torch.Tensor.Internal where
 
 import Data.List (intercalate)
 import Data.Vector (Vector, (!))
 import Data.Vector qualified as V
-import Tensor.Types
+import Torch.Tensor.Types
 
 toList :: LList n a -> [a]
 toList LNil = []
@@ -86,6 +86,12 @@ broadcastShapes (x : xs) (y : ys)
   | x == 1 = (y :) <$> broadcastShapes xs ys
   | y == 1 = (x :) <$> broadcastShapes xs ys
   | otherwise = Nothing
+
+unsqueezeShapeToIfPossible :: [Int] -> [Int] -> [Int]
+unsqueezeShapeToIfPossible oldShape newShape
+  | length oldShape >= length newShape = oldShape
+  | otherwise =
+      replicate (length newShape - length oldShape) 1 ++ oldShape
 
 instance (Show a) => Show (Tensor s a) where
   show (Tensor sh arr) =

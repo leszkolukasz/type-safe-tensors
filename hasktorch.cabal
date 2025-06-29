@@ -8,19 +8,19 @@ name:           hasktorch
 version:        0.0.0
 build-type:     Simple
 
-executable Main
-  main-is: Main.hs
+library
+  exposed-modules:
+      Torch
+      Torch.Module
+      Torch.Tensor
+      Torch.Tensor.Internal
+      Torch.Tensor.Op
+      Torch.Tensor.Types
+      Torch.Utils
   other-modules:
-      Module
-      Playground
-      Tensor
-      Tensor.Internal
-      Tensor.Op
-      Tensor.Types
-      Utils
       Paths_hasktorch
   hs-source-dirs:
-      src
+      lib
   default-extensions:
       TypeFamilies
       DataKinds
@@ -29,5 +29,44 @@ executable Main
       UndecidableInstances
   build-depends:
       base
+    , vector
+  default-language: GHC2021
+
+executable example
+  main-is: Main.hs
+  other-modules:
+      Paths_hasktorch
+  hs-source-dirs:
+      app
+  default-extensions:
+      TypeFamilies
+      DataKinds
+      GADTs
+      AllowAmbiguousTypes
+      UndecidableInstances
+  build-depends:
+      base
+    , hasktorch
+    , vector
+  default-language: GHC2021
+
+test-suite hasktorch-test
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  other-modules:
+      TypeSpec
+      Paths_hasktorch
+  hs-source-dirs:
+      test
+  default-extensions:
+      TypeFamilies
+      DataKinds
+      GADTs
+      AllowAmbiguousTypes
+      UndecidableInstances
+  build-depends:
+      base
+    , hasktorch
+    , hspec
     , vector
   default-language: GHC2021

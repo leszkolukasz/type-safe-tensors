@@ -1,23 +1,13 @@
-module Tensor
+module Torch.Tensor
   ( Tensor (..),
     DoubleTensor,
     FloatTensor,
     IntTensor,
     LList (..),
     Slice (..),
-    Compatible,
-    Unsqueeze,
-    Equal,
-    TakeFirstN,
-    TakeLastN,
-    DropFirstN,
-    DropLastN,
-    Concat,
-    Split,
-    FirstTuple,
-    SecondTuple,
     Any,
     fromList,
+    fromNested2,
     (+.),
     (-.),
     (*.),
@@ -38,6 +28,6 @@ module Tensor
   )
 where
 
-import Tensor.Internal
-import Tensor.Op
-import Tensor.Types
+import Torch.Tensor.Internal
+import Torch.Tensor.Op
+import Torch.Tensor.Types
