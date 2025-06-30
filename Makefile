@@ -5,7 +5,7 @@ build:
 	@cabal build
 
 run: build
-	@cabal run example
+	@cabal run mnist
 
 test: build
 	@cabal test

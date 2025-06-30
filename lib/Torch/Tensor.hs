@@ -11,6 +11,7 @@ module Torch.Tensor
     fromScalar,
     fromNested2,
     fromNested3,
+    fromFile,
     full,
     ones,
     zeros,

@@ -46,6 +46,8 @@ type family Union (s1 :: Shape) (s2 :: Shape) :: Shape where
   Union _ _ = TypeError ('Text "Cannot unionize incompatible shapes")
 
 type family BroadcastUnion (s1 :: Shape) (s2 :: Shape) :: Shape where
+  BroadcastUnion s1 '[] = s1
+  BroadcastUnion '[] s2 = s2
   BroadcastUnion s1 s2 = Reverse (BroadcastUnionGo (Reverse s1) (Reverse s2))
 
 type family BroadcastUnionGo (s1 :: [Symbol]) (s2 :: [Symbol]) :: Shape where

@@ -34,9 +34,10 @@ library
     , vector
   default-language: GHC2021
 
-executable example
+executable mnist
   main-is: Main.hs
   other-modules:
+      Playground
       Paths_hasktorch
   hs-source-dirs:
       app

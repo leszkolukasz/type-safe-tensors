@@ -52,6 +52,17 @@ fromNested3 nested =
       array = concatMap concat nested
    in fromList shape array
 
+fromFile :: (Read a) => String -> IO (Tensor s a)
+fromFile filePath = do
+  contents <- readFile filePath
+  let lines' = lines contents
+  case lines' of
+    [shapeLine, elementsLine] -> do
+      let shape = map read (words shapeLine) :: [Int]
+          elements = map read (words elementsLine)
+      return $ Tensor shape (V.fromList elements)
+    _ -> error "File must contain exactly two lines: shape and elements"
+
 full :: [Int] -> a -> Tensor s a
 full s a = case validateShape s of
   Left err -> error err
@@ -274,7 +285,7 @@ isClose (Tensor {shape = s1, array = a1}) (Tensor {shape = s2, array = a2}) epsi
   | otherwise =
       V.all (\(x, y) -> abs (x - y) < epsilon) (V.zip a1 a2)
 
-reshapeUnsafe :: Tensor s a -> [Int] -> Tensor s' a
+reshapeUnsafe :: forall s' s a. Tensor s a -> [Int] -> Tensor s' a
 reshapeUnsafe (Tensor {shape = s, array = a}) newShape =
   let normShape = normalizeReshape s newShape
    in Tensor {shape = normShape, array = a}
