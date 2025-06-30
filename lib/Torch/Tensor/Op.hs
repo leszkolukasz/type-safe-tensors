@@ -7,9 +7,13 @@ import Data.Vector qualified as V
 import GHC.TypeLits (KnownNat, Nat, natVal, type (+), type (-), type (<=))
 import Torch.Tensor.Internal
 import Torch.Tensor.Types
-import Torch.Utils ((|>))
+import Torch.Utils
 
 -- TODO: do constructors like fromNested2, fromNested3 for inputs of type [[a]], [[[a]]] etc.
+
+fromScalar :: a -> Tensor '[b] a
+fromScalar value =
+  Tensor {shape = [1], array = V.singleton value}
 
 fromList :: [Int] -> [a] -> Tensor s a
 fromList shape array
@@ -46,6 +50,20 @@ fromNested3 nested =
       array = concatMap concat nested
    in fromList shape array
 
+full :: [Int] -> a -> Tensor s a
+full s a = case validateShape s of
+  Left err -> error err
+  Right () ->
+    let totalElements = product s
+        array = V.replicate totalElements a
+     in Tensor {shape = s, array = array}
+
+zeros :: [Int] -> Tensor s Double
+zeros s = full s 0.0
+
+ones :: [Int] -> Tensor s Double
+ones s = full s 1.0
+
 sameShapeOp :: (Broadcastable s1 s2 ~ 'True) => (a -> a -> a) -> Tensor s1 a -> Tensor s2 a -> Tensor (BroadcastUnion s1 s2) a
 sameShapeOp op (Tensor {shape = s1, array = a1}) (Tensor {shape = s2, array = a2}) =
   let s1' = unsqueezeShapeToIfPossible s1 s2
@@ -69,7 +87,6 @@ tensorMul = sameShapeOp (*)
 tensorDiv :: (Broadcastable s1 s2 ~ 'True, Fractional a) => Tensor s1 a -> Tensor s2 a -> Tensor (BroadcastUnion s1 s2) a
 tensorDiv = sameShapeOp (/)
 
--- TODO: make it broadcastable
 matmul ::
   forall s1 s2 l n1 n2 m1 m2 a.
   ( Broadcastable (DropLastN s1 2) (DropLastN s2 2) ~ 'True,
@@ -254,3 +271,38 @@ isClose (Tensor {shape = s1, array = a1}) (Tensor {shape = s2, array = a2}) epsi
       error ("Tensors must have the same shape and length: " ++ show s1 ++ " vs " ++ show s2)
   | otherwise =
       V.all (\(x, y) -> abs (x - y) < epsilon) (V.zip a1 a2)
+
+reshapeUnsafe :: Tensor s a -> [Int] -> Tensor s' a
+reshapeUnsafe (Tensor {shape = s, array = a}) newShape =
+  let normShape = normalizeReshape s newShape
+   in Tensor {shape = normShape, array = a}
+
+swapaxesUnsafe :: Tensor s a -> Int -> Int -> Tensor s' a
+swapaxesUnsafe (Tensor {shape = s, array = a}) i j
+  | i < 0 || j < 0 || i >= length s || j >= length s =
+      error ("Invalid axes: " ++ show i ++ " and " ++ show j ++ " for shape " ++ show s)
+  | otherwise =
+      if i == j
+        then Tensor {shape = s, array = a}
+        else
+          let newShape = swap s i j
+              newStrides = stridesFromShape newShape
+              oldStrides = stridesFromShape s
+           in let newArray = V.generate (product newShape) $ \k ->
+                    let indices = posToIndices newStrides k
+                        swappedIndices = swap indices i j
+                     in indexFromStride a oldStrides swappedIndices
+               in Tensor {shape = newShape, array = newArray}
+
+swapaxes ::
+  forall i j s a.
+  ( 0 <= i,
+    0 <= j,
+    i + 1 <= Length s,
+    j + 1 <= Length s,
+    KnownNat i,
+    KnownNat j
+  ) =>
+  Tensor s a ->
+  Tensor (Swap s i j) a
+swapaxes t = swapaxesUnsafe t (fromIntegral (natVal (Proxy @i))) (fromIntegral (natVal (Proxy @j)))

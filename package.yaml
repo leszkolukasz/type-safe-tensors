@@ -15,6 +15,7 @@ library:
   dependencies:
     - base
     - vector
+    - deepseq
 
 executables:
   example:
@@ -34,3 +35,4 @@ tests:
       - hasktorch
       - hspec
       - vector
+      - deepseq

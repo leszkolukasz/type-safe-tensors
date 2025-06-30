@@ -7,8 +7,12 @@ module Torch.Tensor
     Slice (..),
     Any,
     fromList,
+    fromScalar,
     fromNested2,
     fromNested3,
+    full,
+    ones,
+    zeros,
     (+.),
     (-.),
     (*.),
@@ -27,6 +31,8 @@ module Torch.Tensor
     slice,
     broadcastTensorTo,
     isClose,
+    reshapeUnsafe,
+    swapaxes,
   )
 where
 

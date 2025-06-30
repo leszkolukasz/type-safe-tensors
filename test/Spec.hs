@@ -1,5 +1,6 @@
 module Main (main) where
 
+import Control.DeepSeq (force)
 import Control.Exception (evaluate)
 import Data.Vector qualified as V
 import Test.Hspec
@@ -90,6 +91,20 @@ main = hspec $ do
     isClose tAdd (t2 +. t1) epsilon `shouldBe` True
     isClose tMul (t2 *. t1) epsilon `shouldBe` True
 
+    let tScalar = fromScalar 2.0 :: DoubleTensor '["b"]
+        tAddScalar = t1 +. tScalar
+        tSubScalar = t1 -. tScalar
+        tMulScalar = t1 *. tScalar
+        tDivScalar = t1 /. tScalar
+    shape tAddScalar `shouldBe` [2, 3]
+    array tAddScalar `shouldBe` V.fromList [3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
+    shape tSubScalar `shouldBe` [2, 3]
+    array tSubScalar `shouldBe` V.fromList [-1.0, 0.0, 1.0, 2.0, 3.0, 4.0]
+    shape tMulScalar `shouldBe` [2, 3]
+    array tMulScalar `shouldBe` V.fromList [2.0, 4.0, 6.0, 8.0, 10.0, 12.0]
+    shape tDivScalar `shouldBe` [2, 3]
+    array tDivScalar `doubleVectorShouldBeClose` V.fromList [0.5, 1.0, 1.5, 2.0, 2.5, 3.0]
+
   it "performs matrix multiplication" $ do
     let t1 = fromNested2 [[1.0, 2.0], [3.0, 4.0]] :: DoubleTensor '["a", "b"]
         t2 = fromNested2 [[5.0, 6.0], [7.0, 8.0]] :: DoubleTensor '["b", "c"]
@@ -172,3 +187,32 @@ main = hspec $ do
         tBroadcasted = broadcastTensorTo t1 t2
     shape tBroadcasted `shouldBe` [2, 3]
     array tBroadcasted `doubleVectorShouldBeClose` V.fromList [10.0, 20.0, 30.0, 10.0, 20.0, 30.0]
+
+  it "reshapes tensors" $ do
+    let t = fromList [2, 3] [1.0, 2.0, 3.0, 4.0, 5.0, 6.0] :: DoubleTensor '["a", "b"]
+    let reshaped = reshapeUnsafe t [3, 2]
+    shape reshaped `shouldBe` [3, 2]
+    array reshaped `doubleVectorShouldBeClose` V.fromList [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+
+    evaluate (force $ reshapeUnsafe t [3]) `shouldThrow` anyErrorCall
+    evaluate (force $ reshapeUnsafe t [4]) `shouldThrow` anyErrorCall
+
+    let reshaped2 = reshapeUnsafe t [-1]
+    shape reshaped2 `shouldBe` [6]
+
+    evaluate (force $ reshapeUnsafe t [0]) `shouldThrow` anyErrorCall
+    evaluate (force $ reshapeUnsafe t [-1, 12]) `shouldThrow` anyErrorCall
+    evaluate (force $ reshapeUnsafe t [4, -1]) `shouldThrow` anyErrorCall
+
+    let reshaped3 = reshapeUnsafe (zeros [5, 3, 2]) [5, -1]
+    shape reshaped3 `shouldBe` [5, 6]
+
+  it "swaps axes" $ do
+    let t = fromList [2, 3] [1.0, 2.0, 3.0, 4.0, 5.0, 6.0] :: DoubleTensor '["a", "b"]
+    let swapped = swapaxes @0 @1 t
+    shape swapped `shouldBe` [3, 2]
+    array swapped `doubleVectorShouldBeClose` V.fromList [1.0, 4.0, 2.0, 5.0, 3.0, 6.0]
+
+    let swapped2 = swapaxes @1 @0 swapped
+    shape swapped2 `shouldBe` [2, 3]
+    array swapped2 `doubleVectorShouldBeClose` V.fromList [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]

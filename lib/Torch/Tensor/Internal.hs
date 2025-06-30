@@ -1,9 +1,12 @@
 module Torch.Tensor.Internal where
 
+import Control.DeepSeq (NFData, rnf)
 import Data.List (intercalate)
 import Data.Vector (Vector, (!))
 import Data.Vector qualified as V
+import Debug.Trace (traceShow)
 import Torch.Tensor.Types
+import Torch.Utils
 
 toList :: LList n a -> [a]
 toList LNil = []
@@ -12,6 +15,12 @@ toList (x :~ xs) = x : toList xs
 toInt :: Fin n -> Int
 toInt FinZ = 0
 toInt (FinS n) = 1 + toInt n
+
+validateShape :: [Int] -> Either String ()
+validateShape [] = Left "Shape cannot be empty"
+validateShape shape
+  | any (< 0) shape = Left "Shape cannot contain negative dimensions"
+  | otherwise = Right ()
 
 normalizeIndices :: [Int] -> [Int] -> [Int]
 normalizeIndices shape indices =
@@ -37,6 +46,25 @@ normalizeSlices shape slices =
        in if idx' < 0 || idx' >= s
             then error "Index out of bounds"
             else Single idx'
+
+normalizeReshape :: [Int] -> [Int] -> [Int]
+normalizeReshape oldShape newShape
+  | count (-1) newShape > 1 =
+      error "Cannot reshape tensor with multiple -1 dimensions"
+  | count (-1) newShape == 1 =
+      let knownSize = product $ filter (/= -1) newShape
+          totalSize = product oldShape
+       in if totalSize `mod` knownSize /= 0
+            then error "Cannot reshape tensor with -1 dimension to fit the total size"
+            else
+              let missingSize = totalSize `div` knownSize
+               in map (\x -> if x == -1 then missingSize else x) newShape
+  | otherwise =
+      if product newShape /= product oldShape
+        then error "Cannot reshape tensor to a different size"
+        else newShape
+  where
+    count x = length . filter (== x)
 
 indexFromStride :: Vector a -> [Int] -> [Int] -> a
 indexFromStride arr strides indices =
@@ -93,6 +121,9 @@ unsqueezeShapeToIfPossible oldShape newShape
   | otherwise =
       replicate (length newShape - length oldShape) 1 ++ oldShape
 
+instance (NFData a) => NFData (Tensor s a) where
+  rnf (Tensor shape array) = rnf (shape, array)
+
 instance (Show a) => Show (Tensor s a) where
   show (Tensor sh arr) =
     "Tensor " ++ show sh ++ ":\n" ++ formatArray sh (V.toList arr)
@@ -103,7 +134,3 @@ formatArray [d] xs = "[" ++ intercalate ", " (map show xs) ++ "]"
 formatArray (d : ds) xs =
   let chunked = chunksOf (product ds) xs
    in "[" ++ intercalate ",\n " (map (formatArray ds) chunked) ++ "]"
-
-chunksOf :: Int -> [a] -> [[a]]
-chunksOf _ [] = []
-chunksOf n xs = let (h, t) = splitAt n xs in h : chunksOf n t

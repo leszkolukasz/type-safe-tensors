@@ -121,6 +121,20 @@ type family Prepend (s :: Shape) (n :: Nat) (v :: Symbol) :: Shape where
   Prepend s 0 v = s
   Prepend l n v = v : Prepend l (n - 1) v
 
+type family Nth (l :: [a]) (n :: Nat) :: a where
+  Nth '[] _ = TypeError ('Text "Index out of bounds")
+  Nth (x : xs) 0 = x
+  Nth (_ : xs) n = Nth xs (n - 1)
+
+type family Swap (l :: [a]) (i :: Nat) (j :: Nat) :: [a] where
+  Swap l i j = SwapGo l l i j 0
+
+type family SwapGo (l :: [a]) (orig :: [a]) (i :: Nat) (j :: Nat) (idx :: Nat) :: [a] where
+  SwapGo '[] _ _ _ _ = '[]
+  SwapGo (x : xs) orig i j i = Nth orig j : SwapGo xs orig i j (i + 1)
+  SwapGo (x : xs) orig i j j = Nth orig i : SwapGo xs orig i j (j + 1)
+  SwapGo (x : xs) orig i j idx = x : SwapGo xs orig i j (idx + 1)
+
 infixr 5 :~
 
 data LList (n :: Nat) (a :: Type) where

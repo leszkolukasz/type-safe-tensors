@@ -33,3 +33,5 @@ main = do
   print $ t1 *. t4
   print $ (fromNested2 [[1.0, 2.0], [3.0, 4.0]] :: DoubleTensor '["dim1", "dim2"])
   print $ (fromList [2, 2, 2] [13.0, 13.0, 14.0, 14.0, 15.0, 15.0, 16.0, 16.0] :: DoubleTensor '["dim1", "dim2", "dim3"])
+  print $ t1
+  print $ reshapeUnsafe t1 [3, 2]

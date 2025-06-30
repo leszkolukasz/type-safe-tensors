@@ -231,3 +231,26 @@ prepend1 = test (Refl :: Prepend '[a, b] 0 c :~: '[a, b])
 
 prepend2 :: ()
 prepend2 = test (Refl :: Prepend '[a, b] 2 c :~: '[c, c, a, b])
+
+-- Nth
+nth1 :: ()
+nth1 = test (Refl :: Nth '[a, b, c] 0 :~: a)
+
+nth2 :: ()
+nth2 = test (Refl :: Nth '[a, b, c] 1 :~: b)
+
+nth3 :: ()
+nth3 = test (Refl :: Nth '[a, b, c] 2 :~: c)
+
+-- Swap
+swap1 :: ()
+swap1 = test (Refl :: Swap '[a, b, c] 0 1 :~: '[b, a, c])
+
+swap2 :: ()
+swap2 = test (Refl :: Swap '[a, b, c] 1 2 :~: '[a, c, b])
+
+swap3 :: ()
+swap3 = test (Refl :: Swap '[a, b, c] 0 2 :~: '[c, b, a])
+
+swap4 :: ()
+swap4 = test (Refl :: Swap '[a, b, c] 1 1 :~: '[a, b, c])
