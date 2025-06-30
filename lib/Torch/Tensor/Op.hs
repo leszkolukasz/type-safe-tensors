@@ -8,10 +8,13 @@ import Data.Vector qualified as V
 import Debug.Trace (trace, traceShow)
 import GHC.TypeLits (KnownNat, Nat, natVal, type (+), type (-), type (<=))
 import Torch.Tensor.Internal
+import Torch.Tensor.Template
 import Torch.Tensor.Types
 import Torch.Utils
 
 -- TODO: do constructors like fromNested2, fromNested3 for inputs of type [[a]], [[[a]]] etc.
+
+$(buildAll 10)
 
 fromScalar :: a -> Tensor '[b] a
 fromScalar value =
@@ -27,30 +30,6 @@ fromList shape array
       Tensor {shape = shape, array = V.fromList array}
   where
     expectedShape = product shape
-
-fromNested2 :: [[a]] -> Tensor [s1, s2] a
-fromNested2 nested
-  | null nested || any null nested =
-      error "Input cannot be empty or contain empty lists"
-  | otherwise =
-      let shape = [length nested, length (head nested)]
-          array = concat nested
-       in if not (validateShape shape nested)
-            then error ("Invalid shape: " ++ show shape ++ " for input")
-            else fromList shape array
-  where
-    validateShape :: [Int] -> [[a]] -> Bool
-    validateShape s arr =
-      if any (/= s !! 1) (map length arr)
-        then error "All inner lists must have the same length"
-        else True
-
-fromNested3 :: [[[a]]] -> Tensor [s1, s2, s3] a
-fromNested3 nested =
-  -- for now assume it is a valid 3D tensor
-  let shape = [length nested, length (head nested), length (head (head nested))]
-      array = concatMap concat nested
-   in fromList shape array
 
 fromFile :: (Read a) => String -> IO (Tensor s a)
 fromFile filePath = do

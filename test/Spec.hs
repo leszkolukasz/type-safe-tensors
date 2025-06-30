@@ -6,6 +6,7 @@ import Data.Proxy (Proxy (..))
 import Data.Vector qualified as V
 import Test.Hspec
 import Torch.Tensor
+import Torch.Tensor.Op
 import TypeSpec qualified
 
 epsilon :: Double
@@ -53,6 +54,14 @@ main = hspec $ do
       let t = fromNested2 [[1.0, 2.0], [3.0, 4.0]] :: DoubleTensor '["a", "b"]
       shape t `shouldBe` [2, 2]
       array t `shouldBe` V.fromList [1.0, 2.0, 3.0, 4.0]
+
+      let t2 = fromNested3 [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]] :: DoubleTensor '["batch", "a", "b"]
+      shape t2 `shouldBe` [2, 2, 2]
+      array t2 `shouldBe` V.fromList [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
+
+      let t3 = fromNested4 [[[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]], [[[9.0, 10.0], [11.0, 12.0]], [[13.0, 14.0], [15.0, 16.0]]]] :: DoubleTensor '["batch", "a", "b", "c"]
+      shape t3 `shouldBe` [2, 2, 2, 2]
+      array t3 `shouldBe` V.fromList [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0]
 
     it "throws when nested lists are empty" $ do
       evaluate (fromNested2 []) `shouldThrow` anyException
@@ -213,11 +222,11 @@ main = hspec $ do
 
   it "swaps axes" $ do
     let t = fromList [2, 3] [1.0, 2.0, 3.0, 4.0, 5.0, 6.0] :: DoubleTensor '["a", "b"]
-    let swapped = swapaxes @0 @1 t
+    let swapped :: DoubleTensor '["b", "a"] = swapaxes @0 @1 t
     shape swapped `shouldBe` [3, 2]
     array swapped `doubleVectorShouldBeClose` V.fromList [1.0, 4.0, 2.0, 5.0, 3.0, 6.0]
 
-    let swapped2 = swapaxes @1 @0 swapped
+    let swapped2 :: DoubleTensor '["a", "b"] = swapaxes @1 @0 swapped
     shape swapped2 `shouldBe` [2, 3]
     array swapped2 `doubleVectorShouldBeClose` V.fromList [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
 

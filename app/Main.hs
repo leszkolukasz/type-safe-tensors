@@ -1,5 +1,6 @@
 import Data.List (intercalate)
 import Data.Vector qualified as V
+import Playground
 import System.IO (hFlush, stdout)
 import Torch.Module
 import Torch.Tensor
@@ -28,7 +29,7 @@ main = do
   let fc1 = Linear {weight = fc1_weight, bias = fc1_bias}
   let fc2 = Linear {weight = fc2_weight, bias = fc2_bias}
 
-  putStr "Image index:"
+  putStr "Image index: "
   hFlush stdout
   imgIdx :: Int <- read <$> getLine
   input :: DoubleTensor '[SIZE, SIZE] <- fromFile ("./pytorch/mnist_exports/image_" ++ show imgIdx ++ ".txt")

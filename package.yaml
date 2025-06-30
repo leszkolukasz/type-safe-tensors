@@ -7,6 +7,7 @@ default-extensions:
   - GADTs
   - AllowAmbiguousTypes
   - UndecidableInstances
+  - TemplateHaskell
 
 ghc-options: -Wno-x-partial
 
@@ -16,6 +17,7 @@ library:
     - base
     - vector
     - deepseq
+    - template-haskell
 
 executables:
   mnist:

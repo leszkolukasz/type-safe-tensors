@@ -15,6 +15,7 @@ library
       Torch.Tensor
       Torch.Tensor.Internal
       Torch.Tensor.Op
+      Torch.Tensor.Template
       Torch.Tensor.Types
       Torch.Utils
   other-modules:
@@ -27,10 +28,12 @@ library
       GADTs
       AllowAmbiguousTypes
       UndecidableInstances
+      TemplateHaskell
   ghc-options: -Wno-x-partial
   build-depends:
       base
     , deepseq
+    , template-haskell
     , vector
   default-language: GHC2021
 
@@ -47,6 +50,7 @@ executable mnist
       GADTs
       AllowAmbiguousTypes
       UndecidableInstances
+      TemplateHaskell
   ghc-options: -Wno-x-partial
   build-depends:
       base
@@ -68,6 +72,7 @@ test-suite hasktorch-test
       GADTs
       AllowAmbiguousTypes
       UndecidableInstances
+      TemplateHaskell
   ghc-options: -Wno-x-partial
   build-depends:
       base

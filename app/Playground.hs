@@ -3,6 +3,7 @@ module Playground where
 import Data.Data (Proxy (..))
 import Data.Vector qualified as V
 import Torch.Tensor
+import Torch.Tensor.Op
 import Torch.Tensor.Types
 import Torch.Utils
 
@@ -41,3 +42,5 @@ play = do
   print $ reshapeUnsafe t1 [3, 2]
   print $ reduceUnsafe V.sum t1 [1]
   print $ reduce V.sum t1 (Proxy @0 :- Proxy @1 :- INil)
+  print $ validate3 [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]]
+  print $ flatten2 [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]]
