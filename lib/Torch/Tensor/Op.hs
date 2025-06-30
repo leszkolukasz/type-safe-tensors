@@ -39,6 +39,13 @@ fromNested2 nested
         then error "All inner lists must have the same length"
         else True
 
+fromNested3 :: [[[a]]] -> Tensor [s1, s2, s3] a
+fromNested3 nested =
+  -- for now assume it is a valid 3D tensor
+  let shape = [length nested, length (head nested), length (head (head nested))]
+      array = concatMap concat nested
+   in fromList shape array
+
 sameShapeOp :: (Broadcastable s1 s2 ~ 'True) => (a -> a -> a) -> Tensor s1 a -> Tensor s2 a -> Tensor (BroadcastUnion s1 s2) a
 sameShapeOp op (Tensor {shape = s1, array = a1}) (Tensor {shape = s2, array = a2}) =
   let s1' = unsqueezeShapeToIfPossible s1 s2
@@ -70,7 +77,7 @@ matmul ::
     Last s1 ~ 'Just n2,
     SndToLast s2 ~ 'Just m1,
     Last s2 ~ 'Just m2,
-    Compatible '[n1] '[n2] ~ 'True,
+    Compatible '[n2] '[m1] ~ 'True,
     Num a
   ) =>
   Tensor s1 a ->
@@ -79,15 +86,15 @@ matmul ::
 matmul t1@(Tensor {shape = s1, array = a1}) t2@(Tensor {shape = s2, array = a2}) =
   let s1' = unsqueezeShapeToIfPossible s1 s2
       s2' = unsqueezeShapeToIfPossible s2 s1
-      prefix1 = take (length s1 - 2) s1'
-      prefix2 = take (length s2 - 2) s2'
+      prefix1 = take (length s1' - 2) s1'
+      prefix2 = take (length s2' - 2) s2'
    in case broadcastShapes prefix1 prefix2 of
         Nothing -> error ("Cannot broadcast shapes: " ++ show s1 ++ " and " ++ show s2)
         Just bcShape ->
           let s1'' = bcShape ++ drop (length prefix1) s1'
               s2'' = bcShape ++ drop (length prefix2) s2'
-              a1' = broadcastArray a1 s1 s1''
-              a2' = broadcastArray a2 s2 s2''
+              a1' = broadcastArray a1 s1' s1''
+              a2' = broadcastArray a2 s2' s2''
               t1' = Tensor {shape = s1'', array = a1'}
               t2' = Tensor {shape = s2'', array = a2'}
               n1 = last (init s1'')
@@ -137,7 +144,7 @@ infixl 7 @.
     Last s1 ~ 'Just n2,
     SndToLast s2 ~ 'Just m1,
     Last s2 ~ 'Just m2,
-    Compatible '[n1] '[n2] ~ 'True,
+    Compatible '[n2] '[m1] ~ 'True,
     Num a
   ) =>
   Tensor s1 a ->
@@ -192,8 +199,6 @@ unsqueezeTo ::
   forall n s1 s2 a l1 l2.
   ( l1 ~ Length s1,
     l2 ~ Length s2,
-    -- KnownNat l1,
-    -- KnownNat l2,
     l1 <= l2,
     Compatible (DropFirstN s2 (l2 - l1)) s1 ~ 'True
   ) =>
@@ -206,16 +211,20 @@ unsqueezeTo from@(Tensor {shape = s1, array = a1}) to@(Tensor {shape = s2}) =
       newShape = replicate n 1 ++ s1
    in Tensor {shape = newShape, array = a1}
 
-test :: DoubleTensor [Any, "Dim"]
-test = unsqueeze @(0) (fromList [3] [4.0, 5.0, 6.0] :: DoubleTensor '["Dim"])
-
-broadcastTensorTo :: Tensor s1 a -> Tensor s2 a -> Tensor s2 a
+broadcastTensorTo ::
+  ( Length s1 <= Length s2,
+    Broadcastable s1 s2 ~ 'True
+  ) =>
+  Tensor s1 a ->
+  Tensor s2 a ->
+  Tensor s2 a
 broadcastTensorTo (Tensor {shape = s1, array = a1}) (Tensor {shape = s2}) =
-  case broadcastShapes s1 s2 of
-    Nothing -> error ("Cannot broadcast shape: " ++ show s1 ++ " to " ++ show s2)
-    Just s3
-      | s2 == s3 -> Tensor {shape = s2, array = broadcastArray a1 s1 s2}
-      | otherwise -> error ("Given shape: " ++ show s2 ++ " has unit dimensions that would need to be broadcasted to input tensor shape")
+  let s1' = unsqueezeShapeToIfPossible s1 s2
+   in case broadcastShapes s1' s2 of
+        Nothing -> error ("Cannot broadcast shape: " ++ show s1 ++ " to " ++ show s2)
+        Just s3
+          | s2 == s3 -> Tensor {shape = s2, array = broadcastArray a1 s1' s2}
+          | otherwise -> error ("Given shape: " ++ show s2 ++ " has unit dimensions that would need to be broadcasted to input tensor shape")
 
 sliceUsafe :: Tensor s a -> [Slice] -> Tensor s a
 sliceUsafe (Tensor {shape = s, array = a}) slices =
@@ -238,3 +247,10 @@ sliceUsafe (Tensor {shape = s, array = a}) slices =
 
 slice :: forall s a n. (Length s ~ n) => Tensor s a -> LList n Slice -> Tensor s a
 slice t s = sliceUsafe t (toList s)
+
+isClose :: (Num a, Ord a) => Tensor s a -> Tensor s a -> a -> Bool
+isClose (Tensor {shape = s1, array = a1}) (Tensor {shape = s2, array = a2}) epsilon
+  | V.length a1 /= V.length a2 || s1 /= s2 =
+      error ("Tensors must have the same shape and length: " ++ show s1 ++ " vs " ++ show s2)
+  | otherwise =
+      V.all (\(x, y) -> abs (x - y) < epsilon) (V.zip a1 a2)

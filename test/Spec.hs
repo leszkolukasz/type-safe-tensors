@@ -59,7 +59,7 @@ main = hspec $ do
     it "performs same shape operations" $ do
       let t1 = fromList [2, 3] [1.0, 2.0, 3.0, 4.0, 5.0, 6.0] :: DoubleTensor '["a", "b"]
           t2 = fromList [2, 3] [6.0, 5.0, 4.0, 3.0, 2.0, 1.0] :: DoubleTensor '["a", "b"]
-          tAdd = t1 +. t2
+          tAdd :: DoubleTensor '["a", "b"] = t1 +. t2
           tSub = t1 -. t2
           tMul = t1 *. t2
           tDiv = t1 /. t2
@@ -72,18 +72,103 @@ main = hspec $ do
       shape tDiv `shouldBe` [2, 3]
       array tDiv `doubleVectorShouldBeClose` V.fromList [0.16666667, 0.4, 0.75, 1.3333333, 2.5, 6.0]
 
--- it "performs broadcasting operations" $ do
---   let t1 = fromList [2, 3] [1.0, 2.0, 3.0, 4.0, 5.0, 6.0] :: DoubleTensor '["a", "b"]
---       t2 = fromList [3] [1.0, 2.0, 3.0] :: DoubleTensor '["b"]
---       tAdd = t1 +. t2
---       tSub = t1 -. t2
---       tMul = t1 *. t2
---       tDiv = t1 /. t2
---   shape tAdd `shouldBe` [2, 3]
---   array tAdd `shouldBe` V.fromList [2.0, 4.0, 6.0, 5.0, 7.0, 9.0]
---   shape tSub `shouldBe` [2, 3]
---   array tSub `shouldBe` V.fromList [0.0, 0.0, 0.0, 3.0, 3.0, 3.0]
---   shape tMul `shouldBe` [2, 3]
---   array tMul `shouldBe` V.fromList [1.0, 4.0, 9.0, 4.0, 10.0, 18.0]
---   shape tDiv `shouldBe` [2, 3]
---   array tDiv `doubleVectorShouldBeClose` V.fromList [1.0, 1.0, 1.0, 4.0, 2.5, 2.0]
+  it "performs broadcasting operations" $ do
+    let t1 = fromList [2, 3] [1.0, 2.0, 3.0, 4.0, 5.0, 6.0] :: DoubleTensor '["a", "b"]
+        t2 = fromList [3] [1.0, 2.0, 3.0] :: DoubleTensor '["b"]
+        tAdd :: DoubleTensor '["a", "b"] = t1 +. t2
+        tSub = t1 -. t2
+        tMul = t1 *. t2
+        tDiv = t1 /. t2
+    shape tAdd `shouldBe` [2, 3]
+    array tAdd `shouldBe` V.fromList [2.0, 4.0, 6.0, 5.0, 7.0, 9.0]
+    shape tSub `shouldBe` [2, 3]
+    array tSub `shouldBe` V.fromList [0.0, 0.0, 0.0, 3.0, 3.0, 3.0]
+    shape tMul `shouldBe` [2, 3]
+    array tMul `shouldBe` V.fromList [1.0, 4.0, 9.0, 4.0, 10.0, 18.0]
+    shape tDiv `shouldBe` [2, 3]
+    array tDiv `doubleVectorShouldBeClose` V.fromList [1.0, 1.0, 1.0, 4.0, 2.5, 2.0]
+    isClose tAdd (t2 +. t1) epsilon `shouldBe` True
+    isClose tMul (t2 *. t1) epsilon `shouldBe` True
+
+  it "performs matrix multiplication" $ do
+    let t1 = fromNested2 [[1.0, 2.0], [3.0, 4.0]] :: DoubleTensor '["a", "b"]
+        t2 = fromNested2 [[5.0, 6.0], [7.0, 8.0]] :: DoubleTensor '["b", "c"]
+        tMatMul = t1 @. t2
+    shape tMatMul `shouldBe` [2, 2]
+    array tMatMul `doubleVectorShouldBeClose` V.fromList [19.0, 22.0, 43.0, 50.0]
+
+    let t3 = fromNested2 [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]] :: DoubleTensor '["a", "b"]
+        t4 = fromNested2 [[7.0], [8.0], [9.0]] :: DoubleTensor '["b", "c"]
+        tMatMul2 = t3 @. t4
+    shape tMatMul2 `shouldBe` [2, 1]
+    array tMatMul2 `doubleVectorShouldBeClose` V.fromList [50.0, 122.0]
+
+    let t5 = fromNested2 [[2.0, 1.0], [5.0, 3.0]] :: DoubleTensor '["a", "b"]
+        t6 = fromNested2 [[3.0, -1.0], [-5.0, 2.0]] :: DoubleTensor '["b", "a"]
+        tMatMul3 = t5 @. t6
+    shape tMatMul3 `shouldBe` [2, 2]
+    array tMatMul3 `doubleVectorShouldBeClose` V.fromList [1.0, 0.0, 0.0, 1.0]
+
+  it "performs batched matrix multiplication" $ do
+    let t1 = fromNested3 [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]] :: DoubleTensor '["batch", "a", "b"]
+        t2 = fromNested3 [[[9.0, 10.0], [11.0, 12.0]], [[13.0, 14.0], [15.0, 16.0]]] :: DoubleTensor '["batch", "b", "c"]
+        tBatchedMatMul = t1 @. t2
+    shape tBatchedMatMul `shouldBe` [2, 2, 2]
+    array tBatchedMatMul `doubleVectorShouldBeClose` V.fromList [31.0, 34.0, 71.0, 78.0, 155.0, 166.0, 211.0, 226.0]
+
+  it "performs broadcasted matrix multiplication" $ do
+    let t1 = fromNested3 [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]] :: DoubleTensor '["batch", "a", "b"]
+        t2 = fromNested2 [[13.0, 14.0], [15.0, 16.0]] :: DoubleTensor '["b", "c"]
+        tBatchedMatMul = t1 @. t2
+    shape tBatchedMatMul `shouldBe` [2, 2, 2]
+    print tBatchedMatMul
+    array tBatchedMatMul `doubleVectorShouldBeClose` V.fromList [43.0, 46.0, 99.0, 106.0, 155.0, 166.0, 211.0, 226.0]
+
+  it "gets and sets elements" $ do
+    let t = fromList [2, 3] [1.0, 2.0, 3.0, 4.0, 5.0, 6.0] :: DoubleTensor '["a", "b"]
+    get t (0 :~ 1 :~ LNil) `shouldBe` 2.0
+    let t' = set t (0 :~ 1 :~ LNil) 10.0
+    get t' (0 :~ 1 :~ LNil) `shouldBe` 10.0
+    array t' `shouldBe` V.fromList [1.0, 10.0, 3.0, 4.0, 5.0, 6.0]
+
+  it "squeezes and unsqueezes dimensions" $ do
+    let t = fromList [3] [1.0, 2.0, 3.0] :: DoubleTensor '["a"]
+    let unsqT = unsqueeze @0 t
+    shape unsqT `shouldBe` [1, 3]
+    let unsqT2 = unsqueeze @2 unsqT
+    shape unsqT2 `shouldBe` [1, 3, 1]
+    let sqT = squeeze @2 unsqT2
+    shape sqT `shouldBe` [1, 3]
+    let sqT2 = squeeze @0 sqT
+    shape sqT2 `shouldBe` [3]
+
+  it "unsqueezes to a specific shape" $ do
+    let t1 = fromList [3] [1.0, 2.0, 3.0] :: DoubleTensor '["a"]
+    let t2 = fromList [2, 3] [1.0, 2.0, 3.0, 1.0, 2.0, 3.0] :: DoubleTensor '["b", "a"]
+    let unsqT = unsqueezeTo t1 t2
+    shape unsqT `shouldBe` [1, 3]
+
+    let t3 = unsqueeze @0 t2
+    let unsqT2 = unsqueezeTo t1 t3
+    shape unsqT2 `shouldBe` [1, 1, 3]
+
+  it "slices tensors" $ do
+    let t = fromList [2, 3] [1.0, 2.0, 3.0, 4.0, 5.0, 6.0] :: DoubleTensor '["a", "b"]
+    let sliced = slice t (Single 1 :~ Range 1 2 :~ LNil)
+    shape sliced `shouldBe` [1, 1]
+    array sliced `doubleVectorShouldBeClose` V.fromList [5.0]
+
+    let sliced2 = slice t (All :~ Single 1 :~ LNil)
+    shape sliced2 `shouldBe` [2, 1]
+    array sliced2 `doubleVectorShouldBeClose` V.fromList [2.0, 5.0]
+
+    let sliced3 = slice t (Single 0 :~ All :~ LNil)
+    shape sliced3 `shouldBe` [1, 3]
+    array sliced3 `doubleVectorShouldBeClose` V.fromList [1.0, 2.0, 3.0]
+
+  it "broadcasts tensors" $ do
+    let t2 = fromList [2, 3] [1.0, 2.0, 3.0, 4.0, 5.0, 6.0] :: DoubleTensor '["a", "b"]
+        t1 = fromList [3] [10.0, 20.0, 30.0] :: DoubleTensor '["b"]
+        tBroadcasted = broadcastTensorTo t1 t2
+    shape tBroadcasted `shouldBe` [2, 3]
+    array tBroadcasted `doubleVectorShouldBeClose` V.fromList [10.0, 20.0, 30.0, 10.0, 20.0, 30.0]

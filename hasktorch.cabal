@@ -27,6 +27,7 @@ library
       GADTs
       AllowAmbiguousTypes
       UndecidableInstances
+  ghc-options: -Wno-x-partial
   build-depends:
       base
     , vector
@@ -44,6 +45,7 @@ executable example
       GADTs
       AllowAmbiguousTypes
       UndecidableInstances
+  ghc-options: -Wno-x-partial
   build-depends:
       base
     , hasktorch
@@ -64,6 +66,7 @@ test-suite hasktorch-test
       GADTs
       AllowAmbiguousTypes
       UndecidableInstances
+  ghc-options: -Wno-x-partial
   build-depends:
       base
     , hasktorch

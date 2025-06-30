@@ -8,6 +8,7 @@ module Torch.Tensor
     Any,
     fromList,
     fromNested2,
+    fromNested3,
     (+.),
     (-.),
     (*.),
@@ -25,6 +26,7 @@ module Torch.Tensor
     sliceUsafe,
     slice,
     broadcastTensorTo,
+    isClose,
   )
 where
 

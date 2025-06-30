@@ -8,6 +8,8 @@ default-extensions:
   - AllowAmbiguousTypes
   - UndecidableInstances
 
+ghc-options: -Wno-x-partial
+
 library:
   source-dirs: lib
   dependencies:
