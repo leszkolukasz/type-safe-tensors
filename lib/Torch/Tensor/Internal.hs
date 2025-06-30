@@ -140,6 +140,9 @@ instance (Show a) => Show (Tensor s a) where
   show (Tensor sh arr) =
     "Tensor " ++ show sh ++ ":\n" ++ formatArray sh (V.toList arr)
 
+instance Functor (Tensor s) where
+  fmap f (Tensor shape arr) = Tensor shape (V.map f arr)
+
 formatArray :: (Show a) => [Int] -> [a] -> String
 formatArray [] xs = error "Tensor has no dimensions"
 formatArray [d] xs = "[" ++ intercalate ", " (map show xs) ++ "]"

@@ -148,13 +148,49 @@ type family LtNatGo (x :: Ordering) :: Bool where
   LtNatGo 'EQ = 'False
   LtNatGo 'GT = 'False
 
+type family EqNat (x :: Nat) (y :: Nat) :: Bool where
+  EqNat x y = EqNatGo (CmpNat x y)
+
+type family EqNatGo (x :: Ordering) :: Bool where
+  EqNatGo 'LT = 'False
+  EqNatGo 'EQ = 'True
+  EqNatGo 'GT = 'False
+
 type family And (a :: Bool) (b :: Bool) :: Bool where
   And 'True 'True = 'True
   And _ _ = 'False
 
+type family Or (a :: Bool) (b :: Bool) :: Bool where
+  Or 'False 'False = 'False
+  Or _ _ = 'True
+
 type family AllBelow (l :: [Nat]) (n :: Nat) :: Bool where
   AllBelow '[] _ = 'True
   AllBelow (x : xs) n = And (LtNat x n) (AllBelow xs n)
+
+type family Elem (x :: Nat) (l :: [Nat]) :: Bool where
+  Elem _ '[] = 'False
+  Elem x (y : ys) = Or (EqNat x y) (Elem x ys)
+
+type family Range (end :: Nat) :: [Nat] where
+  Range n = RangeGo n 0
+
+type family RangeGo (end :: Nat) (idx :: Nat) :: [Nat] where
+  RangeGo end end = '[]
+  RangeGo end idx = idx : RangeGo end (idx + 1)
+
+type family RemoveDims (s :: [a]) (l :: [Nat]) :: [a] where
+  RemoveDims s l = RemoveDimsGo s l (Range (Length s))
+
+type family RemoveDimsGo (s :: [a]) (l :: [Nat]) (idxs :: [Nat]) :: [a] where
+  RemoveDimsGo '[] _ _ = '[]
+  RemoveDimsGo _ _ '[] = '[]
+  RemoveDimsGo (n : s) l (i : idxs) = Concat (RemoveDimsGo2 (n : s) (Elem i l)) (RemoveDimsGo s l idxs)
+
+type family RemoveDimsGo2 (s :: [a]) (e :: Bool) :: [a] where
+  RemoveDimsGo2 '[] _ = '[]
+  RemoveDimsGo2 (n : s) 'True = '[]
+  RemoveDimsGo2 (n : s) 'False = '[n]
 
 type Reductor a = Vector a -> a
 

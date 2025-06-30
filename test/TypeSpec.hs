@@ -265,6 +265,14 @@ ltNat2 = test (Refl :: LtNat 2 1 :~: 'False)
 ltNat3 :: ()
 ltNat3 = test (Refl :: LtNat 2 2 :~: 'False)
 
+-- EqNat
+
+eqNat1 :: ()
+eqNat1 = test (Refl :: EqNat 1 1 :~: 'True)
+
+eqNat2 :: ()
+eqNat2 = test (Refl :: EqNat 1 2 :~: 'False)
+
 -- AllBelow
 
 allBelow1 :: ()
@@ -278,3 +286,37 @@ allBelow3 = test (Refl :: AllBelow '[1, 2, 3] 3 :~: 'False)
 
 allBelow4 :: ()
 allBelow4 = test (Refl :: AllBelow '[1, 2, 3] 2 :~: 'False)
+
+-- Elem
+elem1 :: ()
+elem1 = test (Refl :: Elem 1 '[1, 2, 3] :~: 'True)
+
+elem2 :: ()
+elem2 = test (Refl :: Elem 4 '[1, 2, 3] :~: 'False)
+
+-- Range
+range1 :: ()
+range1 = test (Refl :: Range 0 :~: '[])
+
+range2 :: ()
+range2 = test (Refl :: Range 3 :~: '[0, 1, 2])
+
+-- RemoveDims
+
+removeDims1 :: ()
+removeDims1 = test (Refl :: RemoveDims '[] '[] :~: '[])
+
+removeDims2 :: ()
+removeDims2 = test (Refl :: RemoveDims '[a, b, c] '[] :~: '[a, b, c])
+
+removeDims3 :: ()
+removeDims3 = test (Refl :: RemoveDims '[a, b, c] '[0] :~: '[b, c])
+
+removeDims4 :: ()
+removeDims4 = test (Refl :: RemoveDims '[a, b, c] '[1] :~: '[a, c])
+
+removeDims5 :: ()
+removeDims5 = test (Refl :: RemoveDims '[a, b, c] '[0, 2] :~: '[b])
+
+removeDims6 :: ()
+removeDims6 = test (Refl :: RemoveDims '[a, b, c] '[2, 1, 0] :~: '[])

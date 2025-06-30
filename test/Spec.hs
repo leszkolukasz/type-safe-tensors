@@ -2,6 +2,7 @@ module Main (main) where
 
 import Control.DeepSeq (force)
 import Control.Exception (evaluate)
+import Data.Proxy (Proxy (..))
 import Data.Vector qualified as V
 import Test.Hspec
 import Torch.Tensor
@@ -16,10 +17,13 @@ shouldBeClose x y epsilon = abs (x - y) `shouldSatisfy` (< epsilon)
 vectorShouldBeClose :: (Ord a, Num a, Show a) => V.Vector a -> V.Vector a -> a -> Expectation
 vectorShouldBeClose v1 v2 epsilon = do
   V.length v1 `shouldBe` V.length v2
-  V.zipWithM_ (\x y -> shouldBeClose x y epsilon) v1 v2 -- TODO: check this
+  V.zipWithM_ (\x y -> shouldBeClose x y epsilon) v1 v2
 
 doubleVectorShouldBeClose :: V.Vector Double -> V.Vector Double -> Expectation
 doubleVectorShouldBeClose v1 v2 = vectorShouldBeClose v1 v2 epsilon
+
+mean :: (Fractional a) => V.Vector a -> a
+mean v = V.sum v / fromIntegral (V.length v)
 
 main :: IO ()
 main = hspec $ do
@@ -216,3 +220,21 @@ main = hspec $ do
     let swapped2 = swapaxes @1 @0 swapped
     shape swapped2 `shouldBe` [2, 3]
     array swapped2 `doubleVectorShouldBeClose` V.fromList [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+
+  it "reduces tensors" $ do
+    let t = fromList [2, 3] [1.0, 2.0, 3.0, 4.0, 5.0, 6.0] :: DoubleTensor '["a", "b"]
+        reducedSum = reduce V.sum t (Proxy @0 :- Proxy @1 :- INil)
+    shape reducedSum `shouldBe` [1]
+    array reducedSum `doubleVectorShouldBeClose` V.fromList [21.0]
+
+    let reducesSum2 = reduce V.sum t (Proxy @0 :- INil)
+    shape reducesSum2 `shouldBe` [3]
+    array reducesSum2 `doubleVectorShouldBeClose` V.fromList [5.0, 7.0, 9.0]
+
+    let reducedSum3 = reduce V.sum t (Proxy @1 :- INil)
+    shape reducedSum3 `shouldBe` [2]
+    array reducedSum3 `doubleVectorShouldBeClose` V.fromList [6.0, 15.0]
+
+    let reducedMean = reduce mean t (Proxy @0 :- Proxy @1 :- INil)
+    shape reducedMean `shouldBe` [1]
+    array reducedMean `doubleVectorShouldBeClose` V.fromList [3.5]

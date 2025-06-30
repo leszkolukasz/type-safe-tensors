@@ -101,7 +101,7 @@ matmul ::
   ) =>
   Tensor s1 a ->
   Tensor s2 a ->
-  Tensor (Concat (DropLastN s1 2) [n1, m2]) a
+  Tensor (Concat (BroadcastUnion (DropLastN s1 2) (DropLastN s2 2)) [n1, m2]) a
 matmul t1@(Tensor {shape = s1, array = a1}) t2@(Tensor {shape = s2, array = a2}) =
   let s1' = unsqueezeShapeToIfPossible s1 s2
       s2' = unsqueezeShapeToIfPossible s2 s1
@@ -168,7 +168,7 @@ infixl 7 @.
   ) =>
   Tensor s1 a ->
   Tensor s2 a ->
-  Tensor (Concat (DropLastN s1 2) [n1, m2]) a
+  Tensor (Concat (BroadcastUnion (DropLastN s1 2) (DropLastN s2 2)) [n1, m2]) a
 (@.) = matmul
 
 getUnsafe :: Tensor s a -> [Int] -> a
@@ -279,7 +279,6 @@ reshapeUnsafe (Tensor {shape = s, array = a}) newShape =
   let normShape = normalizeReshape s newShape
    in Tensor {shape = normShape, array = a}
 
--- TODO: safe version, maybe something like KnownList ?
 swapaxesUnsafe :: Tensor s a -> Int -> Int -> Tensor s' a
 swapaxesUnsafe (Tensor {shape = s, array = a}) i j
   | i < 0 || j < 0 || i >= length s || j >= length s =
@@ -342,5 +341,5 @@ reduce ::
   Reductor a ->
   Tensor s a ->
   IList l ->
-  Tensor s' a
+  Tensor (RemoveDims s l) a
 reduce r t l = reduceUnsafe r t (toIntList l)

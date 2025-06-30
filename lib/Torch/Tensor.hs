@@ -4,6 +4,7 @@ module Torch.Tensor
     FloatTensor,
     IntTensor,
     LList (..),
+    IList (..),
     Slice (..),
     Any,
     fromList,
