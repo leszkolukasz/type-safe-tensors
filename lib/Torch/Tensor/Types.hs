@@ -1,9 +1,10 @@
 module Torch.Tensor.Types where
 
+import Data.Data (Proxy (..))
 import Data.Kind (Type)
 import Data.Vector (Vector)
 import Data.Vector qualified as V
-import GHC.TypeLits (ErrorMessage (..), Nat, Symbol, TypeError, type (+), type (-))
+import GHC.TypeLits (CmpNat, ErrorMessage (..), KnownNat, Nat, OrderingI (..), Symbol, TypeError, type (+), type (-), type (<=))
 
 type Any = "Any"
 
@@ -135,11 +136,39 @@ type family SwapGo (l :: [a]) (orig :: [a]) (i :: Nat) (j :: Nat) (idx :: Nat) :
   SwapGo (x : xs) orig i j j = Nth orig i : SwapGo xs orig i j (j + 1)
   SwapGo (x : xs) orig i j idx = x : SwapGo xs orig i j (idx + 1)
 
+type family Not (b :: Bool) :: Bool where
+  Not 'True = 'False
+  Not 'False = 'True
+
+type family LtNat (x :: Nat) (y :: Nat) :: Bool where
+  LtNat x y = LtNatGo (CmpNat x y)
+
+type family LtNatGo (x :: Ordering) :: Bool where
+  LtNatGo 'LT = 'True
+  LtNatGo 'EQ = 'False
+  LtNatGo 'GT = 'False
+
+type family And (a :: Bool) (b :: Bool) :: Bool where
+  And 'True 'True = 'True
+  And _ _ = 'False
+
+type family AllBelow (l :: [Nat]) (n :: Nat) :: Bool where
+  AllBelow '[] _ = 'True
+  AllBelow (x : xs) n = And (LtNat x n) (AllBelow xs n)
+
+type Reductor a = Vector a -> a
+
 infixr 5 :~
+
+infixr 5 :-
 
 data LList (n :: Nat) (a :: Type) where
   LNil :: LList 0 a
   (:~) :: a -> LList n a -> LList (n + 1) a
+
+data IList (l :: [Nat]) where
+  INil :: IList '[]
+  (:-) :: forall n l. (KnownNat n) => Proxy n -> IList l -> IList (n ': l)
 
 data Fin n where
   FinZ :: Fin (n + 1)
@@ -149,3 +178,4 @@ data Slice
   = Range Int Int
   | Single Int
   | All
+  deriving (Show)

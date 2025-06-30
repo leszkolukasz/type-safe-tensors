@@ -1,9 +1,11 @@
 module Torch.Tensor.Op where
 
+import Data.List (nub)
 import Data.Maybe (fromJust, listToMaybe)
 import Data.Proxy (Proxy (..))
 import Data.Vector (Vector, (!), (//))
 import Data.Vector qualified as V
+import Debug.Trace (trace, traceShow)
 import GHC.TypeLits (KnownNat, Nat, natVal, type (+), type (-), type (<=))
 import Torch.Tensor.Internal
 import Torch.Tensor.Types
@@ -277,6 +279,7 @@ reshapeUnsafe (Tensor {shape = s, array = a}) newShape =
   let normShape = normalizeReshape s newShape
    in Tensor {shape = normShape, array = a}
 
+-- TODO: safe version, maybe something like KnownList ?
 swapaxesUnsafe :: Tensor s a -> Int -> Int -> Tensor s' a
 swapaxesUnsafe (Tensor {shape = s, array = a}) i j
   | i < 0 || j < 0 || i >= length s || j >= length s =
@@ -306,3 +309,38 @@ swapaxes ::
   Tensor s a ->
   Tensor (Swap s i j) a
 swapaxes t = swapaxesUnsafe t (fromIntegral (natVal (Proxy @i))) (fromIntegral (natVal (Proxy @j)))
+
+reduceUnsafe :: Reductor a -> Tensor s a -> [Int] -> Tensor s' a
+reduceUnsafe reductor t@(Tensor {shape = s, array = a}) axes
+  | null axes = error "Cannot reduce over an empty list of axes"
+  | otherwise =
+      let normAxes = nub $ normalizeAxes (length s) axes
+       in if length normAxes == length s
+            then Tensor {shape = [1], array = V.singleton (reductor a)}
+            else
+              let newShape = [x | (i, x) <- zip [0 ..] s, i `notElem` normAxes]
+                  isReduced = [i `elem` normAxes | (i, _) <- zip [0 ..] s]
+                  newStrides = stridesFromShape newShape
+                  totalElements = product newShape
+                  newArray =
+                    V.generate totalElements $ \i ->
+                      let indices = posToIndices newStrides i
+                          slices = getSlices indices isReduced
+                          slice = sliceUsafe t slices
+                       in reductor (array slice)
+               in Tensor {shape = newShape, array = newArray}
+  where
+    getSlices :: [Int] -> [Bool] -> [Slice]
+    getSlices [] [] = []
+    getSlices ind (True : xs) = All : getSlices ind xs
+    getSlices (i : ind) (False : xs) = Single i : getSlices ind xs
+
+reduce ::
+  ( Length l <= Length s,
+    AllBelow l (Length s) ~ 'True
+  ) =>
+  Reductor a ->
+  Tensor s a ->
+  IList l ->
+  Tensor s' a
+reduce r t l = reduceUnsafe r t (toIntList l)

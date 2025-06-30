@@ -254,3 +254,27 @@ swap3 = test (Refl :: Swap '[a, b, c] 0 2 :~: '[c, b, a])
 
 swap4 :: ()
 swap4 = test (Refl :: Swap '[a, b, c] 1 1 :~: '[a, b, c])
+
+-- LtNat
+ltNat1 :: ()
+ltNat1 = test (Refl :: LtNat 1 2 :~: 'True)
+
+ltNat2 :: ()
+ltNat2 = test (Refl :: LtNat 2 1 :~: 'False)
+
+ltNat3 :: ()
+ltNat3 = test (Refl :: LtNat 2 2 :~: 'False)
+
+-- AllBelow
+
+allBelow1 :: ()
+allBelow1 = test (Refl :: AllBelow '[] 0 :~: 'True)
+
+allBelow2 :: ()
+allBelow2 = test (Refl :: AllBelow '[1, 2, 3] 4 :~: 'True)
+
+allBelow3 :: ()
+allBelow3 = test (Refl :: AllBelow '[1, 2, 3] 3 :~: 'False)
+
+allBelow4 :: ()
+allBelow4 = test (Refl :: AllBelow '[1, 2, 3] 2 :~: 'False)

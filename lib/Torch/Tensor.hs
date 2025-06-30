@@ -33,6 +33,8 @@ module Torch.Tensor
     isClose,
     reshapeUnsafe,
     swapaxes,
+    reduceUnsafe,
+    reduce,
   )
 where
 

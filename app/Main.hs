@@ -1,3 +1,4 @@
+import Data.Data (Proxy (..))
 import Data.Vector qualified as V
 import Torch.Tensor
 import Torch.Tensor.Types
@@ -9,6 +10,7 @@ main = do
   let t2 = fromList [2, 3] [10.0, 12.0, 13.0, 14.0, 15.0, 16.0] :: DoubleTensor '["dim1", "dim2"]
   let t3 = fromList [1, 3] [100.0, 101.0, 102.0] :: DoubleTensor '["dim1", "dim2"]
   let t4 = fromList [1, 1] [1000.0] :: DoubleTensor '["dim1", "dim2"]
+  let t43 = fromList [1] [1000.0] :: DoubleTensor '["dim1"]
   let t42 = fromList [1, 2, 2] [1.0, 0.0, 0.0, 1.0] :: DoubleTensor '["dim1", "dim1", "dim3"]
   let t5 = fromList [3, 2] [100.0, 101.0, 102.0, 103.0, 104.0, 105.0] :: DoubleTensor '["dim2", "dim3"]
   print t1
@@ -35,3 +37,5 @@ main = do
   print $ (fromList [2, 2, 2] [13.0, 13.0, 14.0, 14.0, 15.0, 15.0, 16.0, 16.0] :: DoubleTensor '["dim1", "dim2", "dim3"])
   print $ t1
   print $ reshapeUnsafe t1 [3, 2]
+  print $ reduceUnsafe V.sum t1 [1]
+  print $ reduce V.sum t1 (Proxy @0 :- Proxy @1 :- INil)

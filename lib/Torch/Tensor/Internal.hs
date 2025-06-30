@@ -5,12 +5,17 @@ import Data.List (intercalate)
 import Data.Vector (Vector, (!))
 import Data.Vector qualified as V
 import Debug.Trace (traceShow)
+import GHC.TypeLits (natVal)
 import Torch.Tensor.Types
 import Torch.Utils
 
 toList :: LList n a -> [a]
 toList LNil = []
 toList (x :~ xs) = x : toList xs
+
+toIntList :: IList l -> [Int]
+toIntList INil = []
+toIntList (n :- xs) = fromIntegral (natVal n) : toIntList xs
 
 toInt :: Fin n -> Int
 toInt FinZ = 0
@@ -27,6 +32,13 @@ normalizeIndices shape indices =
   let normalized = zipWith (\s i -> if i < 0 then s + i else i) shape indices
    in if any (< 0) normalized || or (zipWith (<=) shape normalized)
         then error "Indices out of bounds"
+        else normalized
+
+normalizeAxes :: Int -> [Int] -> [Int]
+normalizeAxes rank axes =
+  let normalized = map (\a -> if a < 0 then rank + a else a) axes
+   in if any (< 0) normalized || any (>= rank) normalized
+        then error "Axes out of bounds"
         else normalized
 
 normalizeSlices :: [Int] -> [Slice] -> [Slice]
