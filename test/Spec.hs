@@ -232,18 +232,18 @@ main = hspec $ do
 
   it "reduces tensors" $ do
     let t = fromList [2, 3] [1.0, 2.0, 3.0, 4.0, 5.0, 6.0] :: DoubleTensor '["a", "b"]
-        reducedSum = reduce V.sum t (Proxy @0 :- Proxy @1 :- INil)
+        reducedSum :: DoubleTensor '[Any] = reduce V.sum t (Proxy @0 :- Proxy @1 :- INil)
     shape reducedSum `shouldBe` [1]
     array reducedSum `doubleVectorShouldBeClose` V.fromList [21.0]
 
-    let reducesSum2 = reduce V.sum t (Proxy @0 :- INil)
+    let reducesSum2 :: DoubleTensor '["b"] = reduce V.sum t (Proxy @0 :- INil)
     shape reducesSum2 `shouldBe` [3]
     array reducesSum2 `doubleVectorShouldBeClose` V.fromList [5.0, 7.0, 9.0]
 
-    let reducedSum3 = reduce V.sum t (Proxy @1 :- INil)
+    let reducedSum3 :: DoubleTensor '["a"] = reduce V.sum t (Proxy @1 :- INil)
     shape reducedSum3 `shouldBe` [2]
     array reducedSum3 `doubleVectorShouldBeClose` V.fromList [6.0, 15.0]
 
-    let reducedMean = reduce mean t (Proxy @0 :- Proxy @1 :- INil)
+    let reducedMean :: DoubleTensor '[Any] = reduce mean t (Proxy @0 :- Proxy @1 :- INil)
     shape reducedMean `shouldBe` [1]
     array reducedMean `doubleVectorShouldBeClose` V.fromList [3.5]

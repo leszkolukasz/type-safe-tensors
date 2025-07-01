@@ -181,8 +181,12 @@ type family RangeGo (end :: Nat) (idx :: Nat) :: [Nat] where
   RangeGo end end = '[]
   RangeGo end idx = idx : RangeGo end (idx + 1)
 
-type family RemoveDims (s :: [a]) (l :: [Nat]) :: [a] where
-  RemoveDims s l = RemoveDimsGo s l (Range (Length s))
+type family RemoveDims (s :: [a]) (l :: [Nat]) (d :: a) :: [a] where
+  RemoveDims s l d = DefaultIfEmpty (RemoveDimsGo s l (Range (Length s))) '[d]
+
+type family DefaultIfEmpty (l :: [a]) (d :: [a]) :: [a] where
+  DefaultIfEmpty '[] d = d
+  DefaultIfEmpty l _ = l
 
 type family RemoveDimsGo (s :: [a]) (l :: [Nat]) (idxs :: [Nat]) :: [a] where
   RemoveDimsGo '[] _ _ = '[]

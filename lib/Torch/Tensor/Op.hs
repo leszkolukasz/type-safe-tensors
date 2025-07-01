@@ -329,5 +329,5 @@ reduce ::
   Reductor a ->
   Tensor s a ->
   IList l ->
-  Tensor (RemoveDims s l) a
+  Tensor (RemoveDims s l Any) a
 reduce r t l = reduceUnsafe r t (toIntList l)

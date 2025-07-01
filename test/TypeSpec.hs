@@ -304,19 +304,19 @@ range2 = test (Refl :: Range 3 :~: '[0, 1, 2])
 -- RemoveDims
 
 removeDims1 :: ()
-removeDims1 = test (Refl :: RemoveDims '[] '[] :~: '[])
+removeDims1 = test (Refl :: RemoveDims '[] '[] Any :~: '[Any])
 
 removeDims2 :: ()
-removeDims2 = test (Refl :: RemoveDims '[a, b, c] '[] :~: '[a, b, c])
+removeDims2 = test (Refl :: RemoveDims '[a, b, c] '[] Any :~: '[a, b, c])
 
 removeDims3 :: ()
-removeDims3 = test (Refl :: RemoveDims '[a, b, c] '[0] :~: '[b, c])
+removeDims3 = test (Refl :: RemoveDims '[a, b, c] '[0] Any :~: '[b, c])
 
 removeDims4 :: ()
-removeDims4 = test (Refl :: RemoveDims '[a, b, c] '[1] :~: '[a, c])
+removeDims4 = test (Refl :: RemoveDims '[a, b, c] '[1] Any :~: '[a, c])
 
 removeDims5 :: ()
-removeDims5 = test (Refl :: RemoveDims '[a, b, c] '[0, 2] :~: '[b])
+removeDims5 = test (Refl :: RemoveDims '[a, b, c] '[0, 2] Any :~: '[b])
 
 removeDims6 :: ()
-removeDims6 = test (Refl :: RemoveDims '[a, b, c] '[2, 1, 0] :~: '[])
+removeDims6 = test (Refl :: RemoveDims '[a, b, c] '[2, 1, 0] Any :~: '[Any])
