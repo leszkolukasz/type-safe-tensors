@@ -4,7 +4,7 @@ This is a pure Haskell tensor library inspired by PyTorch. It provides type-safe
 
 <br>
 
-> [Note]
+> [!NOTE]
 > This is a toy library created as final project for the "Advanced functional programming" course at the University of Warsaw.
 
 ## Why Type-Level Shapes?
@@ -29,7 +29,7 @@ Moreover, shapes will propagate through operations, so if you multiply tensor `[
 
 <br>
 
-> [NOTE]
+> [!NOTE]
 > There is alternative way to implement type-safe tensors, and it is to store exact dimensions in the type system as natural numbers. There are existing libraries that do this so check them out if you are interested.
 
 ## Features
