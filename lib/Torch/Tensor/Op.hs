@@ -12,8 +12,6 @@ import Torch.Tensor.Template
 import Torch.Tensor.Types
 import Torch.Utils
 
--- TODO: do constructors like fromNested2, fromNested3 for inputs of type [[a]], [[[a]]] etc.
-
 $(buildAll 10)
 
 fromScalar :: a -> Tensor '[b] a
