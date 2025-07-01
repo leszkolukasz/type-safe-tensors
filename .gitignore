@@ -1,2 +1,6 @@
 dist-newstyle
 .vscode
+pytorch/data
+pytorch/mnist_exports
+pytorch/*.txt
+pytorch/*.pth
